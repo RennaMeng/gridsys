@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     const modelName = images?.length > 0
       ? 'gemini-2.5-pro'
-      : 'gemini-2.0-flash';
+      : 'gemini-2.5-pro';
 
     const imageParts = (images || []).map((base64: string) => ({
       inlineData: {
