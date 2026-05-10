@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
     const modelName = images?.length > 0
-      ? 'gemini-1.5-pro'
-      : 'gemini-1.5-flash';
+      ? 'gemini-2.5-pro'
+      : 'gemini-2.0-flash';
 
     const imageParts = (images || []).map((base64: string) => ({
       inlineData: {
