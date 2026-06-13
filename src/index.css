@@ -1,0 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-swiss-red: #FF3333;
+  --color-swiss-black: #111111;
+  --color-swiss-white: #FFFFFF;
+  --color-swiss-grey-base: #EBEBEB;
+  --color-swiss-grey-canvas: #D6D6D6;
+  --color-swiss-grey-dark: #888888;
+
+  --grid-line: rgba(255, 51, 51, 0.15);
+  --grid-line-strong: rgba(255, 51, 51, 0.3);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-swiss-grey-base text-swiss-black font-sans selection:bg-swiss-red selection:text-white antialiased overflow-hidden;
+  }
+}
+
+.glass-panel {
+  @apply bg-white/85 backdrop-blur-[12px] border-x border-black/10 shadow-none;
+}
+
+.section-label {
+  @apply text-[9px] font-bold uppercase tracking-[1.5px] text-swiss-grey-dark mb-3;
+}
+
+.inspector-row {
+  @apply flex justify-between items-center pb-3 border-b border-black/5;
+}
+
+.inspector-value {
+  @apply font-mono text-[11px] bg-[#f0f0f0] px-[6px] py-[2px] rounded-[2px];
+}
+
+.hardware-input {
+  @apply bg-[#f0f0f0] border-none focus:ring-1 focus:ring-swiss-red outline-none transition-all px-2 py-1 text-[11px] font-mono rounded-[2px];
+}
+
+/* Precision Hardware Slider Styling */
+.precision-slider {
+  @apply appearance-none w-full bg-swiss-black/10 h-[2px] outline-none cursor-crosshair transition-all rounded-full;
+}
+
+.precision-slider::-webkit-slider-thumb {
+  @apply appearance-none w-[2px] h-[16px] bg-swiss-black border-none transition-all duration-75;
+}
+
+.precision-slider:active::-webkit-slider-thumb {
+  @apply bg-swiss-red h-[24px] w-[3px];
+}
+
+.precision-slider:active {
+  @apply bg-swiss-red/20;
+}
+
+.control-dial {
+  @apply w-full h-[4px] bg-[#ddd] relative my-[15px];
+}
+
+.control-knob {
+  @apply absolute top-[-6px] w-[2px] h-[16px] bg-swiss-black;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Removed physical handles in favor of Parametric Inspector */
+/* Technical styling for manual resize handles */
+.react-resizable-handle {
+  width: 12px !important;
+  height: 12px !important;
+  background-image: none !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+.react-resizable-handle-se {
+  border-right: 2px solid #FF3333 !important;
+  border-bottom: 2px solid #FF3333 !important;
+  bottom: 4px !important;
+  right: 4px !important;
+  opacity: 0.4;
+  transition: opacity 0.2s, border-width 0.2s;
+}
+
+.react-resizable-handle-se:hover {
+  opacity: 1;
+  border-width: 4px !important;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.react-grid-placeholder {
+  background-color: rgba(255, 51, 51, 0.1) !important;
+  border: 2px dashed #FF3333 !important;
+  transition: all 0.075s ease !important;
+  z-index: 5 !important;
+}
