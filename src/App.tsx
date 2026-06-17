@@ -44,27 +44,53 @@ import { LayoutBlock, GridSettings } from './types';
 // Constants
 const COLUMNS = 12;
 const ROWS = 8; 
-const FRAME_WIDTH = 960;
-const FRAME_HEIGHT = 540; 
 const MARGIN = 48;
 const GUTTER = 12;
 
-// The core architectural fix: Precise, isolated Safe Area dimensions
-const SAFE_AREA_WIDTH = FRAME_WIDTH - (MARGIN * 2);  // 864
-const SAFE_AREA_HEIGHT = FRAME_HEIGHT - (MARGIN * 2); // 444
+type CanvasPresetId = 'digital-16-9' | 'strip-1800-768' | 'a3' | 'a4';
 
-// Precise mathematical dimension calculation for perfect alignment
-const COL_WIDTH = (SAFE_AREA_WIDTH - (COLUMNS - 1) * GUTTER) / COLUMNS; // 60
-const ROW_HEIGHT = (SAFE_AREA_HEIGHT - (ROWS - 1) * GUTTER) / ROWS;     // 45
-const COL_UNIT = COL_WIDTH + GUTTER; // 72
-const ROW_UNIT = ROW_HEIGHT + GUTTER; // 57
+const CANVAS_PRESETS: Array<{
+  id: CanvasPresetId;
+  label: string;
+  viewportLabel: string;
+  width: number;
+  height: number;
+}> = [
+  { id: 'digital-16-9', label: '16:9', viewportLabel: '16:9_DIGITAL', width: 960, height: 540 },
+  { id: 'strip-1800-768', label: 'STRIP', viewportLabel: 'STRIP_1800x768', width: 1800, height: 768 },
+  { id: 'a3', label: 'A3', viewportLabel: 'A3_PRINT', width: 1123, height: 1587 },
+  { id: 'a4', label: 'A4', viewportLabel: 'A4_PRINT', width: 794, height: 1123 },
+];
 
-// Helper to get pixel position and size
-const getPixelRect = (x: number, y: number, w: number, h: number) => ({
-  left: x * COL_UNIT,
-  top: y * ROW_UNIT,
-  width: w * COL_WIDTH + (w - 1) * GUTTER,
-  height: h * ROW_HEIGHT + (h - 1) * GUTTER
+const getGridMetrics = (preset: { width: number; height: number }) => {
+  const safeAreaWidth = preset.width - (MARGIN * 2);
+  const safeAreaHeight = preset.height - (MARGIN * 2);
+  const colWidth = (safeAreaWidth - (COLUMNS - 1) * GUTTER) / COLUMNS;
+  const rowHeight = (safeAreaHeight - (ROWS - 1) * GUTTER) / ROWS;
+  const colUnit = colWidth + GUTTER;
+  const rowUnit = rowHeight + GUTTER;
+
+  return {
+    safeAreaWidth,
+    safeAreaHeight,
+    colWidth,
+    rowHeight,
+    colUnit,
+    rowUnit,
+  };
+};
+
+const getPixelRect = (
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  metrics: ReturnType<typeof getGridMetrics>
+) => ({
+  left: x * metrics.colUnit,
+  top: y * metrics.rowUnit,
+  width: w * metrics.colWidth + (w - 1) * GUTTER,
+  height: h * metrics.rowHeight + (h - 1) * GUTTER
 });
 
 const INITIAL_BLOCKS: LayoutBlock[] = [
@@ -108,6 +134,12 @@ export default function App() {
   const [zoom, setZoom] = useState(0.85);
   const [isLocked, setIsLocked] = useState(false);
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem('gridSysGuideSeen') !== '1');
+  const [canvasPresetId, setCanvasPresetId] = useState<CanvasPresetId>('digital-16-9');
+  const canvasPreset = useMemo(
+    () => CANVAS_PRESETS.find(preset => preset.id === canvasPresetId) || CANVAS_PRESETS[0],
+    [canvasPresetId]
+  );
+  const gridMetrics = useMemo(() => getGridMetrics(canvasPreset), [canvasPreset]);
   
   // AI Panel 显示状态
   const [showAIPanel, setShowAIPanel] = useState(false);
@@ -278,8 +310,8 @@ export default function App() {
     const block = currentBlocks.find(b => b.id === leadId);
     if (!block) return;
 
-    const dx = Math.round((e.clientX - startMouseX) / zoom / COL_UNIT);
-    const dy = Math.round((e.clientY - startMouseY) / zoom / ROW_UNIT);
+    const dx = Math.round((e.clientX - startMouseX) / zoom / gridMetrics.colUnit);
+    const dy = Math.round((e.clientY - startMouseY) / zoom / gridMetrics.rowUnit);
     const selectedBlocks = currentBlocks.filter(b => ids.includes(b.id));
     const minDx = Math.max(...selectedBlocks.map(b => -startPositions[b.id].x));
     const maxDx = Math.min(...selectedBlocks.map(b => COLUMNS - b.w - startPositions[b.id].x));
@@ -324,8 +356,8 @@ export default function App() {
     const handleMove = (moveEvent: MouseEvent) => {
       if (!selectionRef.current || !safeAreaRef.current) return;
       const areaRect = safeAreaRef.current.getBoundingClientRect();
-      const currentX = Math.max(0, Math.min(SAFE_AREA_WIDTH, (moveEvent.clientX - areaRect.left) / zoom));
-      const currentY = Math.max(0, Math.min(SAFE_AREA_HEIGHT, (moveEvent.clientY - areaRect.top) / zoom));
+      const currentX = Math.max(0, Math.min(gridMetrics.safeAreaWidth, (moveEvent.clientX - areaRect.left) / zoom));
+      const currentY = Math.max(0, Math.min(gridMetrics.safeAreaHeight, (moveEvent.clientY - areaRect.top) / zoom));
       const box = {
         left: Math.min(selectionRef.current.startX, currentX),
         top: Math.min(selectionRef.current.startY, currentY),
@@ -335,7 +367,7 @@ export default function App() {
       setSelectionBox(box);
       const selected = blocksRef.current
         .filter(block => {
-          const blockRect = getPixelRect(block.x, block.y, block.w, block.h);
+          const blockRect = getPixelRect(block.x, block.y, block.w, block.h, gridMetrics);
           return box.left < blockRect.left + blockRect.width &&
             box.left + box.width > blockRect.left &&
             box.top < blockRect.top + blockRect.height &&
@@ -384,8 +416,8 @@ export default function App() {
     const block = blocks.find(b => b.id === id);
     if (!block) return;
 
-    const dw = Math.round((e.clientX - startMouseX) / zoom / COL_UNIT);
-    const dh = Math.round((e.clientY - startMouseY) / zoom / ROW_UNIT);
+    const dw = Math.round((e.clientX - startMouseX) / zoom / gridMetrics.colUnit);
+    const dh = Math.round((e.clientY - startMouseY) / zoom / gridMetrics.rowUnit);
 
     const newW = Math.max(1, Math.min(COLUMNS - block.x, startW + dw));
     const newH = Math.max(1, Math.min(ROWS - block.y, startH + dh));
@@ -445,20 +477,20 @@ export default function App() {
   const exportSVG = () => {
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('width', String(FRAME_WIDTH));
-    svg.setAttribute('height', String(FRAME_HEIGHT));
-    svg.setAttribute('viewBox', `0 0 ${FRAME_WIDTH} ${FRAME_HEIGHT}`);
+    svg.setAttribute('width', String(canvasPreset.width));
+    svg.setAttribute('height', String(canvasPreset.height));
+    svg.setAttribute('viewBox', `0 0 ${canvasPreset.width} ${canvasPreset.height}`);
     svg.setAttribute('xmlns', svgNS);
     const bg = document.createElementNS(svgNS, 'rect');
-    bg.setAttribute('width', String(FRAME_WIDTH));
-    bg.setAttribute('height', String(FRAME_HEIGHT));
+    bg.setAttribute('width', String(canvasPreset.width));
+    bg.setAttribute('height', String(canvasPreset.height));
     bg.setAttribute('fill', '#ffffff');
     svg.appendChild(bg);
     blocks.forEach(block => {
-      const x = MARGIN + block.x * (COL_WIDTH + GUTTER);
-      const y = MARGIN + block.y * (ROW_HEIGHT + GUTTER);
-      const w = block.w * COL_WIDTH + (block.w - 1) * GUTTER;
-      const h = block.h * ROW_HEIGHT + (block.h - 1) * GUTTER;
+      const x = MARGIN + block.x * (gridMetrics.colWidth + GUTTER);
+      const y = MARGIN + block.y * (gridMetrics.rowHeight + GUTTER);
+      const w = block.w * gridMetrics.colWidth + (block.w - 1) * GUTTER;
+      const h = block.h * gridMetrics.rowHeight + (block.h - 1) * GUTTER;
 
       const rect = document.createElementNS(svgNS, 'rect');
       rect.setAttribute('x', String(x));
@@ -600,7 +632,7 @@ export default function App() {
     const blob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
-    a.download = 'gridsys_layout.svg'; a.click();
+    a.download = `gridsys_layout_${canvasPreset.viewportLabel.toLowerCase()}.svg`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -618,8 +650,9 @@ export default function App() {
 你的任务是根据用户的描述和 Moodboard 参考图，生成一个适合的网格排版布局。
 
 网格系统规格：
-- 画布：12列 × 8行
-- 每列宽：60px，每行高：45px，间距：12px
+- 当前画布：${canvasPreset.viewportLabel}，${canvasPreset.width}px × ${canvasPreset.height}px
+- 画布网格：12列 × 8行
+- 当前每列宽：${gridMetrics.colWidth.toFixed(2)}px，每行高：${gridMetrics.rowHeight.toFixed(2)}px，间距：12px
 - 坐标从 (0,0) 开始，x 最大 11，y 最大 7
 
 你必须只输出一个合法的 JSON 对象，不要有任何其他文字、解释或 markdown 代码块。
@@ -739,7 +772,25 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                 <Plus size={12} strokeWidth={4} />
               </button>
             </div>
-            <span>VIEWPORT: 16:9_DIGITAL</span>
+            <div className="flex items-center gap-2">
+              <span>VIEWPORT: {canvasPreset.viewportLabel}</span>
+              <div className="flex border border-white/15 bg-white/5">
+                {CANVAS_PRESETS.map(preset => (
+                  <button
+                    key={preset.id}
+                    onClick={() => setCanvasPresetId(preset.id)}
+                    className={`px-2.5 py-1 text-[10px] font-black font-mono transition-colors ${
+                      canvasPresetId === preset.id
+                        ? 'bg-swiss-red text-white'
+                        : 'text-white/55 hover:text-white hover:bg-white/10'
+                    }`}
+                    title={`${preset.viewportLabel} ${preset.width}x${preset.height}px`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -824,12 +875,12 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
           style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
           className="transition-transform duration-300 ease-out py-20"
         >
-          {/* Frame Workspace (16:9) */}
+          {/* Frame Workspace */}
           <div 
             className="relative shadow-2xl bg-white overflow-hidden"
-            style={{ width: FRAME_WIDTH, height: FRAME_HEIGHT }}
+            style={{ width: canvasPreset.width, height: canvasPreset.height }}
           >
-            <GridView showGrid={showGrid} />
+            <GridView showGrid={showGrid} preset={canvasPreset} metrics={gridMetrics} />
             
             {/* Isolated Safe Area Wrapper: The strict bounding box */}
             <div 
@@ -840,8 +891,8 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
               style={{ 
                 top: `${MARGIN}px`, 
                 left: `${MARGIN}px`, 
-                width: `${SAFE_AREA_WIDTH}px`,
-                height: `${SAFE_AREA_HEIGHT}px`,
+                width: `${gridMetrics.safeAreaWidth}px`,
+                height: `${gridMetrics.safeAreaHeight}px`,
                 boxSizing: 'border-box'
               }}
             >
@@ -855,8 +906,8 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                 const isDragging = dragPreview?.id === block.id;
                 const isSelected = selectedIds.includes(block.id);
                 const rect = isDragging 
-                  ? getPixelRect(dragPreview!.x, dragPreview!.y, block.w, block.h)
-                  : getPixelRect(block.x, block.y, block.w, block.h);
+                  ? getPixelRect(dragPreview!.x, dragPreview!.y, block.w, block.h, gridMetrics)
+                  : getPixelRect(block.x, block.y, block.w, block.h, gridMetrics);
 
                 return (
                   <div 
@@ -1144,6 +1195,36 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
 
       {/* Sidebar Right: Inspector */}
       <aside className="fixed right-0 top-[52px] bottom-0 w-[260px] glass-panel z-40 p-6 flex flex-col overflow-hidden">
+        <div className="mb-6 pb-5 border-b border-swiss-black/10">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="section-label !mb-0">Canvas Size</h2>
+            <span className="font-mono text-[9px] font-bold text-swiss-red">
+              {canvasPreset.width}x{canvasPreset.height}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1">
+            {CANVAS_PRESETS.map(preset => (
+              <button
+                key={preset.id}
+                onClick={() => setCanvasPresetId(preset.id)}
+                className={`px-2 py-2 border text-[10px] font-black font-mono uppercase transition-all ${
+                  canvasPresetId === preset.id
+                    ? 'bg-swiss-red text-white border-swiss-red'
+                    : 'bg-white text-swiss-black border-swiss-black/10 hover:border-swiss-red hover:text-swiss-red'
+                }`}
+                title={`${preset.viewportLabel} ${preset.width}x${preset.height}px`}
+              >
+                <span className="block">{preset.label}</span>
+                <span className={`block mt-1 text-[8px] font-medium ${
+                  canvasPresetId === preset.id ? 'text-white/70' : 'text-swiss-black/35'
+                }`}>
+                  {preset.width}x{preset.height}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="mb-6">
           <h2 className="section-label">Parametric Inspector</h2>
           {selectedBlock ? (
@@ -1667,7 +1748,15 @@ function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBl
   );
 }
 
-function GridView({ showGrid }: { showGrid: boolean }) {
+function GridView({
+  showGrid,
+  preset,
+  metrics
+}: {
+  showGrid: boolean;
+  preset: typeof CANVAS_PRESETS[number];
+  metrics: ReturnType<typeof getGridMetrics>;
+}) {
   if (!showGrid) return null;
   return (
     <div className="absolute inset-0 pointer-events-none select-none">
@@ -1677,8 +1766,8 @@ function GridView({ showGrid }: { showGrid: boolean }) {
         style={{ 
           padding: MARGIN,
           gap: GUTTER,
-          gridTemplateColumns: `repeat(${COLUMNS}, ${COL_WIDTH}px)`,
-          gridTemplateRows: `repeat(${ROWS}, ${ROW_HEIGHT}px)`
+          gridTemplateColumns: `repeat(${COLUMNS}, ${metrics.colWidth}px)`,
+          gridTemplateRows: `repeat(${ROWS}, ${metrics.rowHeight}px)`
         }}
       >
         {[...Array(COLUMNS * ROWS)].map((_, i) => (
@@ -1692,8 +1781,8 @@ function GridView({ showGrid }: { showGrid: boolean }) {
         ))}
       </div>
       <div className="absolute top-4 left-4 font-mono text-[8px] text-swiss-red/40 flex gap-4 uppercase font-bold">
-        <span>Canvas: 16:9</span>
-        <span>Resolution: 960x540</span>
+        <span>Canvas: {preset.label}</span>
+        <span>Resolution: {preset.width}x{preset.height}</span>
       </div>
       <div className="absolute bottom-4 left-4 font-mono text-[8px] text-swiss-red/40 flex gap-4 uppercase font-bold">
         <span>Modular: {COLUMNS}x{ROWS}</span>
