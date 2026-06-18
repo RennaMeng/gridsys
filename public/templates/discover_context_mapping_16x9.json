@@ -1,0 +1,210 @@
+{
+  "templateMeta": {
+    "templateId": "discover_context_mapping_16x9",
+    "templateName": "Discover Context Mapping",
+    "pageType": "discover",
+    "doubleDiamondStage": "discover",
+    "layoutPurpose": "context_research_overview",
+    "narrativeRole": "introduce_problem_space_and_research_context",
+    "suitableFor": [
+      "background research",
+      "context mapping",
+      "problem space introduction",
+      "trend analysis",
+      "user group mapping",
+      "existing case analysis",
+      "research insight framing"
+    ]
+  },
+  "canvas": {
+    "ratio": "16:9",
+    "width": 1920,
+    "height": 1080,
+    "orientation": "landscape",
+    "safeMargin": {
+      "top": 60,
+      "right": 70,
+      "bottom": 60,
+      "left": 70
+    }
+  },
+  "grid": {
+    "type": "research_infographic_grid",
+    "columns": 12,
+    "rows": 10,
+    "columnGap": 16,
+    "rowGap": 16,
+    "layoutDensity": "high",
+    "alignment": "structured_asymmetric"
+  },
+  "contentRequirements": {
+    "required": [
+      "page_title",
+      "background_summary",
+      "evidence_or_mapping",
+      "research_question"
+    ],
+    "optional": [
+      "context_visual",
+      "key_statistics",
+      "category_map",
+      "timeline_map",
+      "case_study_grid",
+      "trend_chart",
+      "comparison_chart"
+    ]
+  },
+  "slots": {
+    "textSlots": [
+      {
+        "id": "page_title",
+        "role": "title",
+        "required": true,
+        "maxLines": 1,
+        "fontSizeLevel": "large",
+        "fontStyle": "bold_italic"
+      },
+      {
+        "id": "background_summary",
+        "role": "background_summary",
+        "required": true,
+        "maxWords": 90,
+        "fontSizeLevel": "body"
+      },
+      {
+        "id": "section_heading",
+        "role": "section_heading",
+        "required": false,
+        "maxWords": 8,
+        "fontSizeLevel": "medium",
+        "fontStyle": "bold"
+      },
+      {
+        "id": "evidence_caption",
+        "role": "evidence_explanation",
+        "required": false,
+        "maxWords": 35,
+        "fontSizeLevel": "small"
+      },
+      {
+        "id": "research_question",
+        "role": "design_opportunity_question",
+        "required": true,
+        "maxWords": 20,
+        "fontSizeLevel": "large",
+        "fontStyle": "bold_italic"
+      }
+    ],
+    "imageSlots": [
+      {
+        "id": "context_visual",
+        "role": "context_visual",
+        "required": false,
+        "contentType": "photo_or_render",
+        "priority": "high",
+        "cropStyle": "landscape"
+      },
+      {
+        "id": "case_study_image",
+        "role": "existing_case_or_precedent",
+        "required": false,
+        "contentType": "photo",
+        "priority": "medium",
+        "cropStyle": "rectangle_or_square"
+      }
+    ],
+    "dataSlots": [
+      {
+        "id": "key_statistic",
+        "role": "key_number",
+        "required": false,
+        "format": "percentage_or_large_number",
+        "visualStyle": "large_number_card"
+      }
+    ],
+    "mappingSlots": [
+      {
+        "id": "category_map",
+        "role": "classification_mapping",
+        "required": false,
+        "structure": "horizontal_category_map",
+        "maxCategories": 8,
+        "supportsCutoutImages": true,
+        "supportsLabels": true
+      }
+    ]
+  },
+  "styleRules": {
+    "background": "light_or_dark",
+    "visualDensity": "high",
+    "layoutStyle": "research_board_infographic",
+    "typography": {
+      "title": "bold_italic",
+      "sectionHeading": "bold",
+      "body": "regular",
+      "caption": "regular_or_italic",
+      "highlightText": "bold"
+    },
+    "colorTokens": {
+      "background": "var(--background)",
+      "text": "var(--text)",
+      "accent": "var(--accent)",
+      "secondaryAccent": "var(--secondary-accent)",
+      "mutedText": "var(--muted-text)"
+    },
+    "graphicElements": {
+      "supportsArrows": true,
+      "supportsDividers": true,
+      "supportsHighlightBlocks": true,
+      "supportsCutoutImages": true,
+      "supportsChartOverlays": true
+    }
+  },
+  "aiGenerationRules": {
+    "mainLogic": "explain_why_this_problem_or_opportunity_exists",
+    "layoutLogic": "research_information_mapping",
+    "prioritizeTextHierarchy": true,
+    "prioritizeEvidenceVisibility": true,
+    "allowHighDensityLayout": true,
+    "allowMixedMedia": true,
+    "allowCharts": true,
+    "allowTimelines": true,
+    "allowCategoryMaps": true,
+    "avoid": [
+      "project-specific topic summary",
+      "decorative images without research purpose",
+      "final product display"
+    ],
+    "recommendedFor": [
+      "background research",
+      "context mapping",
+      "problem space introduction",
+      "trend analysis",
+      "user group mapping",
+      "existing case analysis",
+      "research insight framing"
+    ]
+  },
+  "layoutVariants": [
+    {
+      "variantId": "discover_split_context_and_mapping",
+      "layoutLogic": "left_background_right_mapping",
+      "bestFor": [
+        "complex problem space",
+        "multiple user groups",
+        "classification research",
+        "existing behavior mapping"
+      ]
+    },
+    {
+      "variantId": "discover_trend_forecast_board",
+      "layoutLogic": "top_context_bottom_forecast",
+      "bestFor": [
+        "future trend analysis",
+        "technology landscape",
+        "social change research",
+        "market or system forecast"
+      ]
+    }
+  ]
+}

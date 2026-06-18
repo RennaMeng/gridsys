@@ -1,0 +1,188 @@
+{
+  "templateMeta": {
+    "templateId": "develop_prototype_demo_16x9",
+    "templateName": "Develop Prototype Demonstration Layout",
+    "pageType": "develop",
+    "doubleDiamondStage": "develop",
+    "layoutPurpose": "prototype_function_testing",
+    "narrativeRole": "explain_how_the_prototype_works",
+    "suitableFor": [
+      "prototype testing",
+      "function demonstration",
+      "wearable design",
+      "medical product design",
+      "interaction scenario display",
+      "material experiment"
+    ]
+  },
+  "canvas": {
+    "ratio": "16:9",
+    "width": 1920,
+    "height": 1080,
+    "orientation": "landscape",
+    "safeMargin": {
+      "top": 80,
+      "right": 100,
+      "bottom": 80,
+      "left": 100
+    }
+  },
+  "grid": {
+    "type": "modular_editorial_grid",
+    "columns": 12,
+    "rows": 8,
+    "columnGap": 20,
+    "rowGap": 20,
+    "layoutDensity": "medium_high",
+    "alignment": "asymmetric_balanced"
+  },
+  "contentRequirements": {
+    "required": [
+      "page_title",
+      "context_text",
+      "function_text",
+      "main_usage_image",
+      "detail_or_supporting_image"
+    ],
+    "optional": [
+      "usage_text",
+      "component_image",
+      "alternative_usage_image",
+      "material_detail_image",
+      "captions",
+      "annotations"
+    ]
+  },
+  "slots": {
+    "textSlots": [
+      {
+        "id": "page_title",
+        "role": "title",
+        "required": true,
+        "maxLines": 1,
+        "fontStyle": "bold_italic"
+      },
+      {
+        "id": "context_text",
+        "role": "context_label",
+        "required": true,
+        "maxWords": 25
+      },
+      {
+        "id": "function_text",
+        "role": "functional_explanation",
+        "required": true,
+        "maxWords": 60
+      },
+      {
+        "id": "usage_text",
+        "role": "instructional_description",
+        "required": false,
+        "maxWords": 70
+      }
+    ],
+    "imageSlots": [
+      {
+        "id": "hero_usage_image",
+        "role": "main_usage_demonstration",
+        "required": true,
+        "priority": "high",
+        "contentType": "photo",
+        "cropStyle": "landscape",
+        "annotationAllowed": true
+      },
+      {
+        "id": "secondary_usage_image",
+        "role": "alternative_movement_demonstration",
+        "required": false,
+        "priority": "high",
+        "contentType": "photo",
+        "cropStyle": "landscape",
+        "annotationAllowed": true
+      },
+      {
+        "id": "component_image",
+        "role": "component_display",
+        "required": false,
+        "priority": "medium",
+        "contentType": "photo",
+        "cropStyle": "square",
+        "annotationAllowed": false
+      },
+      {
+        "id": "material_detail_image",
+        "role": "material_or_structure_detail",
+        "required": false,
+        "priority": "medium",
+        "contentType": "macro_photo",
+        "cropStyle": "landscape_or_square",
+        "annotationAllowed": false
+      }
+    ],
+    "captionSlots": [
+      {
+        "id": "image_caption",
+        "role": "image_explanation",
+        "required": false,
+        "position": "below_related_image",
+        "maxWords": 20,
+        "style": "italic"
+      }
+    ]
+  },
+  "styleRules": {
+    "background": "white",
+    "visualDensity": "medium_high",
+    "layoutStyle": "clean_product_documentation",
+    "imageStyle": "clean_documentary_photography",
+    "typography": {
+      "title": "bold_italic",
+      "body": "regular_italic",
+      "emphasis": "bold",
+      "caption": "italic"
+    },
+    "colorTokens": {
+      "background": "var(--background)",
+      "text": "var(--text)",
+      "accent": "var(--accent)"
+    },
+    "spacing": {
+      "outerMargin": "large",
+      "innerGap": "medium",
+      "captionGap": "small"
+    }
+  },
+  "aiGenerationRules": {
+    "mainLogic": "show_how_the_prototype_works",
+    "layoutLogic": "asymmetric_image_collage_with_text_header",
+    "imageHierarchy": "usage_photo_first",
+    "textHierarchy": "title_context_function_usage",
+    "prioritizeLargeUsagePhotos": true,
+    "allowImageAnnotations": true,
+    "allowCaptions": true,
+    "keepTopAreaForText": true,
+    "avoid": [
+      "purely decorative image collage",
+      "research-only content",
+      "unexplained prototype photos"
+    ],
+    "recommendedFor": [
+      "prototype testing",
+      "function demonstration",
+      "wearable design",
+      "medical product design",
+      "interaction scenario display"
+    ]
+  },
+  "layoutVariants": [
+    {
+      "variantId": "develop_hero_usage_with_text_header",
+      "layoutLogic": "large_usage_photo_with_top_text_and_detail_images",
+      "bestFor": [
+        "prototype usage demonstration",
+        "interaction explanation",
+        "material detail"
+      ]
+    }
+  ]
+}
