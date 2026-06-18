@@ -27,6 +27,10 @@ export interface LayoutBlock {
   fontStyle?: 'normal' | 'italic';
   textColor?: string;
   textAlign?: 'left' | 'center' | 'right';
+  backgroundColor?: string;
+  padding?: number;
+  overflowMode?: 'clip' | 'visible' | 'autoHeight';
+  zIndex?: number;
   linkUrl?: string;
   generatedByAI?: boolean;
 }

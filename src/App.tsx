@@ -49,6 +49,10 @@ const GUTTER = 12;
 
 type CanvasPresetId = 'digital-16-9' | 'strip-1800-768' | 'a3' | 'a4';
 type CanvasOrientation = 'landscape' | 'portrait';
+type LayoutMode = 'strict' | 'editorial';
+
+const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
+const isTextBlock = (type: LayoutBlock['type']) => TEXT_BLOCK_TYPES.includes(type);
 
 const CANVAS_PRESETS: Array<{
   id: CanvasPresetId;
@@ -120,7 +124,10 @@ const INITIAL_BLOCKS: LayoutBlock[] = [
     fontSize: 18,
     fontFamily: 'Inter, sans-serif',
     fontWeight: 'bold',
-    textColor: '#111111'
+    textColor: '#111111',
+    overflowMode: 'visible',
+    padding: 8,
+    zIndex: 2
   },
   { 
     id: '2', 
@@ -134,7 +141,8 @@ const INITIAL_BLOCKS: LayoutBlock[] = [
     imageFit: 'cover',
     imageZoom: 1,
     imagePanX: 0,
-    imagePanY: 0
+    imagePanY: 0,
+    zIndex: 1
   },
 ];
 
@@ -147,6 +155,7 @@ export default function App() {
   const [showGrid, setShowGrid] = useState(true);
   const [zoom, setZoom] = useState(0.85);
   const [isLocked, setIsLocked] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('strict');
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem('gridSysGuideSeen') !== '1');
   const [canvasPresetId, setCanvasPresetId] = useState<CanvasPresetId>('digital-16-9');
   const [canvasOrientation, setCanvasOrientation] = useState<CanvasOrientation>('landscape');
@@ -280,7 +289,11 @@ export default function App() {
       fontFamily: type === 'text' || type === 'heading' || type === 'title' ? 'Inter, sans-serif' : undefined,
       fontWeight: 'normal',
       fontStyle: 'normal',
-      textColor: '#111111'
+      textColor: '#111111',
+      backgroundColor: 'transparent',
+      overflowMode: isTextBlock(type) ? 'visible' : 'clip',
+      padding: isTextBlock(type) ? 8 : undefined,
+      zIndex: blocks.length + 1
     };
     
     setBlocks([...blocks, newBlock]);
@@ -321,6 +334,34 @@ export default function App() {
       const idxA = currentBlocks.findIndex(ob => ob.id === a.id);
       const idxB = currentBlocks.findIndex(ob => ob.id === b.id);
       return idxA - idxB;
+    });
+  };
+
+  const settleBlocks = (nextBlocks: LayoutBlock[], activeId?: string) => (
+    layoutMode === 'strict' ? applyCompact(nextBlocks, activeId) : nextBlocks
+  );
+
+  const updateLayerOrder = (id: string, direction: 'front' | 'back' | 'up' | 'down') => {
+    rememberBlocks();
+    setBlocks(prev => {
+      const zValues = prev.map(block => block.zIndex || 1);
+      const minZ = Math.min(...zValues, 1);
+      const maxZ = Math.max(...zValues, 1);
+
+      return prev.map(block => {
+        if (block.id !== id) return block;
+
+        const currentZ = block.zIndex || 1;
+        const nextZ = direction === 'front'
+          ? maxZ + 1
+          : direction === 'back'
+            ? minZ - 1
+            : direction === 'up'
+              ? currentZ + 1
+              : currentZ - 1;
+
+        return { ...block, zIndex: nextZ };
+      });
     });
   };
 
@@ -385,7 +426,7 @@ export default function App() {
           ? { ...b, x: startPositions[b.id].x + clampedDx, y: startPositions[b.id].y + clampedDy }
           : b
       );
-      setBlocks(ids.length > 1 ? movedBlocks : applyCompact(movedBlocks, leadId));
+      setBlocks(ids.length > 1 ? movedBlocks : settleBlocks(movedBlocks, leadId));
     }
   };
 
@@ -485,7 +526,7 @@ export default function App() {
     resizeRef.current = null;
     setIsResizing(false);
     // 松手后触发 compact
-    setBlocks(prev => applyCompact(prev));
+    setBlocks(prev => settleBlocks(prev));
     window.removeEventListener('mousemove', handleResizeMove);
     window.removeEventListener('mouseup', handleResizeEnd);
   };
@@ -518,7 +559,7 @@ export default function App() {
 
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length && !isLocked) {
         rememberBlocks();
-        setBlocks(prev => applyCompact(prev.filter(b => !selectedIds.includes(b.id))));
+        setBlocks(prev => settleBlocks(prev.filter(b => !selectedIds.includes(b.id))));
         selectOnly(null);
       }
     };
@@ -544,16 +585,22 @@ export default function App() {
       const y = MARGIN + block.y * (gridMetrics.rowHeight + GUTTER);
       const w = block.w * gridMetrics.colWidth + (block.w - 1) * GUTTER;
       const h = block.h * gridMetrics.rowHeight + (block.h - 1) * GUTTER;
+      const isTextLayer = isTextBlock(block.type);
+      const backgroundColor = block.backgroundColor || (isTextLayer ? 'transparent' : '#ffffff');
 
-      const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('x', String(x));
-      rect.setAttribute('y', String(y));
-      rect.setAttribute('width', String(w));
-      rect.setAttribute('height', String(h));
-      rect.setAttribute('fill', '#ffffff');
-      rect.setAttribute('stroke', '#111111');
-      rect.setAttribute('stroke-width', '0.5');
-      svg.appendChild(rect);
+      if (!isTextLayer || backgroundColor !== 'transparent') {
+        const rect = document.createElementNS(svgNS, 'rect');
+        rect.setAttribute('x', String(x));
+        rect.setAttribute('y', String(y));
+        rect.setAttribute('width', String(w));
+        rect.setAttribute('height', String(h));
+        rect.setAttribute('fill', backgroundColor === 'transparent' ? '#ffffff' : backgroundColor);
+        if (!isTextLayer) {
+          rect.setAttribute('stroke', '#111111');
+          rect.setAttribute('stroke-width', '0.5');
+        }
+        svg.appendChild(rect);
+      }
 
       if (block.imageUrl) {
         const clipId = `clip-${block.id}`;
@@ -598,18 +645,21 @@ export default function App() {
 
       if (!block.imageUrl) {
         // 文字裁切区域，防止溢出 block 边界
+        const overflowMode = block.overflowMode || (isTextLayer ? 'visible' : 'clip');
         const textClipId = `textclip-${block.id}`;
-        const textDefs = document.createElementNS(svgNS, 'defs');
-        const textClip = document.createElementNS(svgNS, 'clipPath');
-        textClip.setAttribute('id', textClipId);
-        const textClipRect = document.createElementNS(svgNS, 'rect');
-        textClipRect.setAttribute('x', String(x + 4));
-        textClipRect.setAttribute('y', String(y + 4));
-        textClipRect.setAttribute('width', String(w - 8));
-        textClipRect.setAttribute('height', String(h - 8));
-        textClip.appendChild(textClipRect);
-        textDefs.appendChild(textClip);
-        svg.appendChild(textDefs);
+        if (overflowMode !== 'visible') {
+          const textDefs = document.createElementNS(svgNS, 'defs');
+          const textClip = document.createElementNS(svgNS, 'clipPath');
+          textClip.setAttribute('id', textClipId);
+          const textClipRect = document.createElementNS(svgNS, 'rect');
+          textClipRect.setAttribute('x', String(x + 4));
+          textClipRect.setAttribute('y', String(y + 4));
+          textClipRect.setAttribute('width', String(w - 8));
+          textClipRect.setAttribute('height', String(h - 8));
+          textClip.appendChild(textClipRect);
+          textDefs.appendChild(textClip);
+          svg.appendChild(textDefs);
+        }
 
         // 读取 block 的排版属性
         const fontSize = block.fontSize || 13;
@@ -618,15 +668,16 @@ export default function App() {
           : block.fontWeight === 'bold' ? 700 : 400;
         const textAnchor = block.textAlign === 'right' ? 'end'
           : block.textAlign === 'center' ? 'middle' : 'start';
-        const textX = block.textAlign === 'right' ? x + w - 8
+        const padding = block.padding ?? 8;
+        const textX = block.textAlign === 'right' ? x + w - padding
           : block.textAlign === 'center' ? x + w / 2
-          : x + 8; // 左对齐留 8px padding
+          : x + padding;
 
         // 处理自动换行：monospace 字体每字符约 0.62em，serif/sans 约 0.52em
         const charWidth = (block.fontFamily || 'monospace').includes('mono') 
           ? fontSize * 0.62 
           : fontSize * 0.52;
-        const charsPerLine = Math.floor((w - 16) / charWidth);
+        const charsPerLine = Math.floor((w - (padding * 2)) / charWidth);
         const rawText = block.label || '';
         
         // 先按换行符分段，再对每段做自动换行
@@ -657,7 +708,7 @@ export default function App() {
         // 垂直起始位置：title 居中，其他贴顶
         const startY = block.type === 'title'
           ? y + (h - totalTextHeight) / 2 + fontSize
-          : y + 8 + fontSize;
+          : y + padding + fontSize;
 
         // 用 <text> + 多个 <tspan> 实现多行
         const textEl = document.createElementNS(svgNS, 'text');
@@ -669,7 +720,9 @@ export default function App() {
         textEl.setAttribute('text-anchor', textAnchor);
         textEl.setAttribute('x', String(textX));
         textEl.setAttribute('y', String(startY));
-        textEl.setAttribute('clip-path', `url(#${textClipId})`);
+        if (overflowMode !== 'visible') {
+          textEl.setAttribute('clip-path', `url(#${textClipId})`);
+        }
 
         lines.forEach((line, i) => {
           const tspan = document.createElementNS(svgNS, 'tspan');
@@ -714,13 +767,27 @@ export default function App() {
   "blocks": [
     { "type": "title", "label": "标题文字", "x": 0, "y": 0, "w": 8, "h": 1, "category": "Generic" },
     { "type": "image", "label": "IMAGE", "x": 0, "y": 1, "w": 6, "h": 5, "category": "Generic" },
-    { "type": "text", "label": "描述文字", "x": 6, "y": 1, "w": 6, "h": 3, "category": "Generic" }
+    {
+      "type": "text",
+      "label": "描述文字",
+      "x": 6,
+      "y": 1,
+      "w": 6,
+      "h": 3,
+      "category": "Generic",
+      "zIndex": 3,
+      "overflowMode": "visible",
+      "backgroundColor": "transparent",
+      "padding": 8
+    }
   ],
   "reasoning": "简短说明排版思路（中文）"
 }
 
 type 只能是: container | text | heading | image | title
 category 只能是: Generic | Define | Ideation | Prototype | Final
+overflowMode 只能是: clip | visible | autoHeight
+当需要杂志式图文叠压时，可以让文字 block 与图片 block 重叠，并提高文字的 zIndex。
 确保所有 block 不超出边界：x + w <= 12，y + h <= 8
 `;
 
@@ -755,7 +822,7 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
       const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
 
       if (parsed.blocks && Array.isArray(parsed.blocks)) {
-        const newBlocks: LayoutBlock[] = parsed.blocks.map((b: any) => ({
+        const newBlocks: LayoutBlock[] = parsed.blocks.map((b: any, index: number) => ({
           id: Math.random().toString(36).substr(2, 9),
           type: b.type || 'container',
           label: (b.label || 'BLOCK').toUpperCase(),
@@ -770,11 +837,15 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
           fontWeight: b.type === 'title' ? 'bold' : 'normal',
           fontStyle: 'normal',
           textColor: b.type === 'image' ? undefined : '#111111',
+          backgroundColor: b.backgroundColor || 'transparent',
+          overflowMode: b.overflowMode || (b.type === 'text' || b.type === 'heading' || b.type === 'title' ? 'visible' : 'clip'),
+          padding: typeof b.padding === 'number' ? b.padding : 8,
+          zIndex: typeof b.zIndex === 'number' ? b.zIndex : index + 1,
           generatedByAI: true
         }));
 
         rememberBlocks();
-        setBlocks(applyCompact(newBlocks));
+        setBlocks(settleBlocks(newBlocks));
         selectOnly(null);
         setChatMessages(prev => [...prev, {
           role: 'ai',
@@ -874,6 +945,28 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
         </div>
 
         <div className="flex items-center gap-8 text-[11px] font-bold uppercase tracking-wider text-white/50">
+          <div className="flex items-center gap-2">
+            <span>Layout</span>
+            <div className="flex border border-white/15 bg-white/5">
+              {[
+                { value: 'strict' as const, label: 'STRICT' },
+                { value: 'editorial' as const, label: 'FREE' },
+              ].map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setLayoutMode(option.value)}
+                  className={`px-2.5 py-1 text-[10px] font-black font-mono transition-colors ${
+                    layoutMode === option.value
+                      ? 'bg-swiss-red text-white'
+                      : 'text-white/55 hover:text-white hover:bg-white/10'
+                  }`}
+                  title={option.value === 'strict' ? 'Strict Grid: 自动避让' : 'Editorial Freeform: 允许叠放'}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex items-center gap-3">
             <span>Grid Visibility</span>
             <div 
@@ -998,26 +1091,27 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
               {blocks.map(block => {
                 const isDragging = dragPreview?.id === block.id;
                 const isSelected = selectedIds.includes(block.id);
+                const isTextLayer = isTextBlock(block.type);
+                const blockOverflowMode = block.overflowMode || (isTextLayer ? 'visible' : 'clip');
                 const rect = isDragging 
                   ? getPixelRect(dragPreview!.x, dragPreview!.y, block.w, block.h, gridMetrics)
                   : getPixelRect(block.x, block.y, block.w, block.h, gridMetrics);
+                const zIndex = isSelected ? (block.zIndex || 1) + 1000 : (block.zIndex || 1);
 
                 return (
                   <div 
                     key={block.id} 
                     style={{
                       position: 'absolute',
+                      zIndex,
                       left: rect.left,
                       top: rect.top,
                       width: rect.width,
-                      height: rect.height,
+                      minHeight: rect.height,
+                      height: blockOverflowMode === 'autoHeight' && isTextLayer ? 'auto' : rect.height,
                       transition: isDragging ? 'none' : 'left 150ms ease, top 150ms ease, width 150ms ease, height 150ms ease'
                     }}
-                    className={`relative group ${
-                      isSelected 
-                        ? 'z-30 selected-block shadow-2xl' 
-                        : 'z-20'
-                    }`}
+                    className="relative group"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                       e.preventDefault();
@@ -1030,17 +1124,28 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                       handleDragStart(e, block.id);
                     }}
                   >
-                    <div className={`absolute inset-0 flex flex-col border transition-all duration-300 overflow-hidden ${
-                      isSelected 
-                        ? 'bg-swiss-red text-white border-swiss-red shadow-xl ring-2 ring-swiss-red ring-offset-2 ring-offset-white' 
-                        : block.generatedByAI && block.type === 'image'
-                          ? 'bg-[#e8f2ff] border-[#2f80ed]/40 text-[#0b3a66] shadow-sm'
-                          : block.generatedByAI && ['text','heading','title'].includes(block.type)
-                            ? 'bg-[#fff6d8] border-[#c88b00]/40 text-swiss-black shadow-sm'
-                            : block.type === 'blank'
-                              ? 'bg-white/20 border-dashed border-swiss-black/20 text-swiss-black/20 shadow-none'
-                              : 'bg-white border-swiss-black/10 text-swiss-black shadow-sm'
-                    }`}>
+                    <div
+                      className={`absolute inset-0 flex flex-col transition-all duration-300 ${
+                        blockOverflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
+                      } ${
+                        isTextLayer
+                          ? isSelected
+                            ? 'border border-swiss-red ring-2 ring-swiss-red ring-offset-2 ring-offset-white'
+                            : 'border border-transparent group-hover:border-swiss-red/30'
+                          : isSelected
+                            ? 'bg-swiss-red text-white border border-swiss-red shadow-xl ring-2 ring-swiss-red ring-offset-2 ring-offset-white'
+                            : block.generatedByAI && block.type === 'image'
+                              ? 'bg-[#e8f2ff] border border-[#2f80ed]/40 text-[#0b3a66] shadow-sm'
+                              : block.type === 'blank'
+                                ? 'bg-white/20 border border-dashed border-swiss-black/20 text-swiss-black/20 shadow-none'
+                                : 'bg-white border border-swiss-black/10 text-swiss-black shadow-sm'
+                      }`}
+                      style={{
+                        backgroundColor: isTextLayer
+                          ? (block.backgroundColor && block.backgroundColor !== 'transparent' ? block.backgroundColor : 'transparent')
+                          : undefined
+                      }}
+                    >
                       {/* Image Render Layer */}
                       {block.imageUrl ? (
                         <div className="absolute inset-0 z-0 overflow-hidden">
@@ -1074,42 +1179,67 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                       {/* Content Layer */}
                       <div className={`relative z-10 flex flex-col h-full justify-between transition-opacity duration-300 ${
                         block.imageUrl ? 'opacity-0' : 'opacity-100'
-                      } ${['text','heading','title'].includes(block.type) ? 'pt-1 px-2 pb-1' : (block.w === 1 || block.h === 1 ? 'p-1.5' : 'p-4')}`}>
+                      } ${isTextLayer ? '' : (block.w === 1 || block.h === 1 ? 'p-1.5' : 'p-4')}`}>
                         {/* Drag Handle & Label */}
                         {block.type !== 'title' && (
                           <div className={`transition-opacity duration-150 ${
                             isSelected ? 'opacity-100' : 'opacity-0'
-                          } flex items-center justify-between pr-4`}>
+                          } flex items-center justify-between pr-4 ${isTextLayer ? 'absolute -top-5 left-0 right-0 text-swiss-red' : ''}`}>
                             <div className="flex-1 flex items-center gap-2 cursor-move min-w-0">
                               <span className={`${block.w === 1 || block.h === 1 ? 'text-[6px]' : 'text-[10px]'} font-mono font-bold tracking-tight uppercase truncate ${isSelected ? 'text-white' : 'opacity-40'}`}>
-                                {block.category} [{block.w}x{block.h}]
+                                {block.category} [{block.w}x{block.h}] Z:{block.zIndex || 1}
                               </span>
                               <div className={`${block.w === 1 || block.h === 1 ? 'w-1 h-1' : 'w-2 h-2'} rounded-full flex-shrink-0 ${isSelected ? 'bg-white' : 'bg-swiss-red'}`} />
                             </div>
                           </div>
                         )}
                         
-                        <div className={`flex-1 flex flex-col ${['text','heading','title'].includes(block.type) ? 'items-start justify-start' : 'items-center justify-center'} overflow-hidden relative`}>
+                        <div className={`flex-1 flex flex-col ${isTextLayer ? 'items-start justify-start' : 'items-center justify-center'} ${
+                          blockOverflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
+                        } relative`}>
                           {block.type === 'title' ? (
-                            <div className="absolute inset-0 flex items-start justify-start">
-                              <textarea
-                                value={block.label}
-                                onChange={(e) => updateBlock(block.id, { label: e.target.value })}
-                                placeholder="TITLE..."
-                                style={{ 
-                                  fontFamily: block.fontFamily || 'monospace',
-                                  fontWeight: block.fontWeight === 'black' ? 900 : block.fontWeight === 'bold' ? 700 : 400,
-                                  fontStyle: block.fontStyle || 'normal',
-                                  fontSize: `${block.fontSize || 32}px`,
-                                  textAlign: block.textAlign || 'left',
-                                  color: isSelected ? 'inherit' : block.textColor || 'inherit',
-                                }}
-                                className="w-full h-full bg-transparent border-none resize-none outline-none text-left leading-tight tracking-tighter uppercase px-1 placeholder:text-current placeholder:opacity-20 scrollbar-hide drag-handle cursor-move"
-                                onClick={(e) => e.stopPropagation()}
-                                onFocus={() => {
-                                  if (block.label === 'TITLE BLOCK') updateBlock(block.id, { label: '' }, true);
-                                }}
-                              />
+                            <div
+                              className={`${blockOverflowMode === 'autoHeight' ? 'relative' : 'absolute inset-0'} flex items-start justify-start`}
+                              style={{ padding: block.padding ?? 8 }}
+                            >
+                              {isSelected ? (
+                                <textarea
+                                  value={block.label}
+                                  onChange={(e) => updateBlock(block.id, { label: e.target.value })}
+                                  placeholder="TITLE..."
+                                  style={{ 
+                                    fontFamily: block.fontFamily || 'monospace',
+                                    fontWeight: block.fontWeight === 'black' ? 900 : block.fontWeight === 'bold' ? 700 : 400,
+                                    fontStyle: block.fontStyle || 'normal',
+                                    fontSize: `${block.fontSize || 32}px`,
+                                    textAlign: block.textAlign || 'left',
+                                    color: block.textColor || 'inherit',
+                                  }}
+                                  className={`w-full bg-transparent border-none resize-none outline-none text-left leading-tight tracking-tighter uppercase placeholder:text-current placeholder:opacity-20 scrollbar-hide drag-handle cursor-move ${
+                                    blockOverflowMode === 'autoHeight' ? 'min-h-[44px] overflow-visible' : 'h-full'
+                                  }`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onFocus={() => {
+                                    if (block.label === 'TITLE BLOCK') updateBlock(block.id, { label: '' }, true);
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  className={`w-full leading-tight tracking-tighter uppercase whitespace-pre-wrap break-words ${
+                                    blockOverflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
+                                  }`}
+                                  style={{
+                                    fontFamily: block.fontFamily || 'monospace',
+                                    fontWeight: block.fontWeight === 'black' ? 900 : block.fontWeight === 'bold' ? 700 : 400,
+                                    fontStyle: block.fontStyle || 'normal',
+                                    fontSize: `${block.fontSize || 32}px`,
+                                    textAlign: block.textAlign || 'left',
+                                    color: block.textColor || 'inherit',
+                                  }}
+                                >
+                                  {block.label}
+                                </div>
+                              )}
                             </div>
                           ) : block.type === 'text' || block.type === 'heading' ? (
                             <EditableTextBlock block={block} isSelected={isSelected} updateBlock={updateBlock} />
@@ -1122,10 +1252,16 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                           )}
                         </div>
 
-                        {block.type !== 'title' && (
+                        {block.type !== 'title' && (!isTextLayer || isSelected) && (
                           <div className={`transition-opacity duration-150 ${
                             isSelected ? 'opacity-100' : 'opacity-0'
-                          } flex items-center justify-between pt-1 border-t font-mono ${block.w === 1 || block.h === 1 ? 'text-[5px]' : 'text-[8px]'} uppercase tracking-widest ${isSelected ? 'border-white/30' : 'border-swiss-black/10 opacity-30 text-swiss-black'}`}>
+                          } flex items-center justify-between pt-1 border-t font-mono ${block.w === 1 || block.h === 1 ? 'text-[5px]' : 'text-[8px]'} uppercase tracking-widest ${
+                            isTextLayer
+                              ? 'absolute -bottom-5 left-0 right-0 border-none text-swiss-red'
+                              : isSelected
+                                ? 'border-white/30'
+                                : 'border-swiss-black/10 opacity-30 text-swiss-black'
+                          }`}>
                             <div className="flex flex-col">
                               <span>XY:{block.x}:{block.y}</span>
                               <span>WH:{block.w}:{block.h}</span>
@@ -1377,7 +1513,7 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                       const maxW = COLUMNS - newX;
                       const newW = Math.min(selectedBlock.w, maxW);
                       updateBlock(selectedBlock.id, { x: newX, w: newW }, true);
-                      setBlocks(prev => applyCompact(prev));
+                      setBlocks(prev => settleBlocks(prev));
                     }}
                   />
                   <PrecisionSlider 
@@ -1390,7 +1526,7 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                       const maxH = ROWS - newY;
                       const newH = Math.min(selectedBlock.h, maxH);
                       updateBlock(selectedBlock.id, { y: newY, h: newH }, true);
-                      setBlocks(prev => applyCompact(prev));
+                      setBlocks(prev => settleBlocks(prev));
                     }}
                   />
                   <PrecisionSlider 
@@ -1400,7 +1536,7 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                     value={selectedBlock.w} 
                     onChange={(v) => {
                       updateBlock(selectedBlock.id, { w: v }, true);
-                      setBlocks(prev => applyCompact(prev));
+                      setBlocks(prev => settleBlocks(prev));
                     }}
                   />
                   <PrecisionSlider 
@@ -1410,9 +1546,32 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                     value={selectedBlock.h} 
                     onChange={(v) => {
                       updateBlock(selectedBlock.id, { h: v }, true);
-                      setBlocks(prev => applyCompact(prev));
+                      setBlocks(prev => settleBlocks(prev));
                     }}
                   />
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-4 border-t border-swiss-black/10">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">LAYER ORDER</span>
+                  <span className="font-mono text-[9px] font-bold text-swiss-red">Z:{selectedBlock.zIndex || 1}</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { label: 'BACK', action: 'back' as const },
+                    { label: 'DOWN', action: 'down' as const },
+                    { label: 'UP', action: 'up' as const },
+                    { label: 'FRONT', action: 'front' as const },
+                  ].map(item => (
+                    <button
+                      key={item.action}
+                      onClick={() => updateLayerOrder(selectedBlock.id, item.action)}
+                      className="py-1.5 text-[9px] font-bold font-mono border bg-white text-swiss-black border-swiss-black/10 hover:border-swiss-red hover:text-swiss-red transition-all"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1468,6 +1627,63 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
               {selectedBlock && ['text','heading','title'].includes(selectedBlock.type) && (
                 <div className="space-y-3 pt-4 border-t border-swiss-black/10">
                   <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">TYPOGRAPHY</span>
+
+                  <div>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">TEXT LAYER</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        { value: 'visible', label: 'VISIBLE' },
+                        { value: 'clip', label: 'CLIP' },
+                        { value: 'autoHeight', label: 'AUTO' },
+                      ].map(mode => (
+                        <button
+                          key={mode.value}
+                          onClick={() => updateBlock(selectedBlock.id, { overflowMode: mode.value as LayoutBlock['overflowMode'] }, true)}
+                          className={`py-1.5 text-[9px] border transition-all uppercase ${
+                            (selectedBlock.overflowMode || 'visible') === mode.value
+                              ? 'bg-swiss-red text-white border-swiss-red'
+                              : 'bg-white text-swiss-black border-swiss-black/10 hover:border-swiss-red'
+                          }`}
+                        >
+                          {mode.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">BACKGROUND</span>
+                    <div className="grid grid-cols-6 gap-1">
+                      {['transparent', '#FFFFFF', '#FFF3C4', '#1040FF', '#FF3333', '#111111'].map(color => (
+                        <button
+                          key={color}
+                          onClick={() => updateBlock(selectedBlock.id, { backgroundColor: color }, true)}
+                          className={`h-7 border transition-all ${
+                            (selectedBlock.backgroundColor || 'transparent') === color
+                              ? 'ring-2 ring-swiss-red ring-offset-1'
+                              : 'border-swiss-black/10'
+                          } ${color === 'transparent' ? 'bg-white bg-[linear-gradient(135deg,transparent_45%,#ff3333_46%,#ff3333_54%,transparent_55%)]' : ''}`}
+                          style={{ backgroundColor: color === 'transparent' ? undefined : color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                    <input
+                      type="color"
+                      value={(selectedBlock.backgroundColor && selectedBlock.backgroundColor !== 'transparent') ? selectedBlock.backgroundColor : '#ffffff'}
+                      onFocus={rememberBlocks}
+                      onChange={(e) => updateBlock(selectedBlock.id, { backgroundColor: e.target.value })}
+                      className="mt-2 w-full h-8 bg-white border border-swiss-black/10"
+                    />
+                  </div>
+
+                  <PrecisionSlider
+                    label="Padding [PX]"
+                    min={0}
+                    max={48}
+                    value={selectedBlock.padding ?? 8}
+                    onChange={(v) => updateBlock(selectedBlock.id, { padding: v })}
+                  />
 
                   {/* 字体选择 */}
                   <div>
@@ -1740,7 +1956,7 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                 <button 
                   onClick={() => {
                     rememberBlocks();
-                    setBlocks(prev => applyCompact(prev.filter(b => !selectedIds.includes(b.id))));
+                    setBlocks(prev => settleBlocks(prev.filter(b => !selectedIds.includes(b.id))));
                     selectOnly(null);
                   }}
                   className="w-full py-2 bg-transparent text-swiss-black/40 text-[9px] font-mono font-bold uppercase tracking-[0.2em] hover:bg-swiss-red/5 hover:text-swiss-red transition-all border border-swiss-black/5 hover:border-swiss-red/20"
@@ -1825,28 +2041,51 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
 function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBlock, isSelected: boolean, updateBlock: (id: string, updates: Partial<LayoutBlock>, remember?: boolean) => void }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [hasOverflow, setHasOverflow] = useState(false);
+  const overflowMode = block.overflowMode || 'visible';
+  const textStyle: React.CSSProperties = {
+    fontFamily: block.fontFamily || 'monospace',
+    fontWeight: block.fontWeight === 'black' ? 900 : block.fontWeight === 'bold' ? 700 : 400,
+    fontStyle: block.fontStyle || 'normal',
+    fontSize: `${block.fontSize || 13}px`,
+    textAlign: block.textAlign || 'left',
+    color: block.textColor || 'inherit',
+    backgroundColor: 'transparent',
+  };
 
   useEffect(() => {
     const el = textareaRef.current;
     if (el) setHasOverflow(el.scrollHeight > el.clientHeight);
   }, [block.label, block.fontSize, block.w, block.h]);
 
+  if (!isSelected) {
+    return (
+      <div
+        className={`w-full relative leading-snug whitespace-pre-wrap break-words ${
+          overflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
+        } ${overflowMode === 'autoHeight' ? 'min-h-full h-auto' : 'h-full'}`}
+        style={{ ...textStyle, padding: block.padding ?? 8 }}
+      >
+        {block.label}
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-full relative group/text overflow-hidden flex items-start justify-start">
+    <div
+      className={`w-full relative group/text flex items-start justify-start ${
+        overflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
+      } ${overflowMode === 'autoHeight' ? 'min-h-full h-auto' : 'h-full'}`}
+      style={{ padding: block.padding ?? 8 }}
+    >
       <textarea
         ref={textareaRef}
         value={block.label}
         onChange={(e) => updateBlock(block.id, { label: e.target.value })}
         placeholder="TYPE_HERE..."
-        style={{ 
-          fontFamily: block.fontFamily || 'monospace',
-          fontWeight: block.fontWeight === 'black' ? 900 : block.fontWeight === 'bold' ? 700 : 400,
-          fontStyle: block.fontStyle || 'normal',
-          fontSize: `${block.fontSize || 13}px`,
-          textAlign: block.textAlign || 'left',
-          color: isSelected ? 'inherit' : block.textColor || 'inherit',
-        }}
-        className="w-full h-full bg-transparent border-none resize-none outline-none text-left leading-snug placeholder:opacity-20 scrollbar-hide"
+        style={textStyle}
+        className={`w-full bg-transparent border-none resize-none outline-none text-left leading-snug placeholder:opacity-20 scrollbar-hide ${
+          overflowMode === 'autoHeight' ? 'min-h-[44px] overflow-visible' : 'h-full'
+        } ${overflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'}`}
         onClick={(e) => e.stopPropagation()}
         onFocus={() => {
           if (block.label === '点击编辑文字' || block.label === 'TEXT BLOCK') {
