@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   Plus, 
   Minus, 
@@ -48,6 +48,7 @@ const MARGIN = 48;
 const GUTTER = 12;
 
 type CanvasPresetId = 'digital-16-9' | 'strip-1800-768' | 'a3' | 'a4';
+type CanvasOrientation = 'landscape' | 'portrait';
 
 const CANVAS_PRESETS: Array<{
   id: CanvasPresetId;
@@ -55,12 +56,25 @@ const CANVAS_PRESETS: Array<{
   viewportLabel: string;
   width: number;
   height: number;
+  defaultOrientation: CanvasOrientation;
 }> = [
-  { id: 'digital-16-9', label: '16:9', viewportLabel: '16:9_DIGITAL', width: 960, height: 540 },
-  { id: 'strip-1800-768', label: 'STRIP', viewportLabel: 'STRIP_1800x768', width: 1800, height: 768 },
-  { id: 'a3', label: 'A3', viewportLabel: 'A3_PRINT', width: 1123, height: 1587 },
-  { id: 'a4', label: 'A4', viewportLabel: 'A4_PRINT', width: 794, height: 1123 },
+  { id: 'digital-16-9', label: '16:9', viewportLabel: '16:9_DIGITAL', width: 960, height: 540, defaultOrientation: 'landscape' },
+  { id: 'strip-1800-768', label: 'STRIP', viewportLabel: 'STRIP_1800x768', width: 1800, height: 768, defaultOrientation: 'landscape' },
+  { id: 'a3', label: 'A3', viewportLabel: 'A3_PRINT', width: 1123, height: 1587, defaultOrientation: 'portrait' },
+  { id: 'a4', label: 'A4', viewportLabel: 'A4_PRINT', width: 794, height: 1123, defaultOrientation: 'portrait' },
 ];
+
+const resolveCanvasSize = (
+  preset: typeof CANVAS_PRESETS[number],
+  orientation: CanvasOrientation
+) => {
+  const shortSide = Math.min(preset.width, preset.height);
+  const longSide = Math.max(preset.width, preset.height);
+
+  return orientation === 'landscape'
+    ? { width: longSide, height: shortSide }
+    : { width: shortSide, height: longSide };
+};
 
 const getGridMetrics = (preset: { width: number; height: number }) => {
   const safeAreaWidth = preset.width - (MARGIN * 2);
@@ -135,11 +149,18 @@ export default function App() {
   const [isLocked, setIsLocked] = useState(false);
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem('gridSysGuideSeen') !== '1');
   const [canvasPresetId, setCanvasPresetId] = useState<CanvasPresetId>('digital-16-9');
+  const [canvasOrientation, setCanvasOrientation] = useState<CanvasOrientation>('landscape');
   const canvasPreset = useMemo(
     () => CANVAS_PRESETS.find(preset => preset.id === canvasPresetId) || CANVAS_PRESETS[0],
     [canvasPresetId]
   );
-  const gridMetrics = useMemo(() => getGridMetrics(canvasPreset), [canvasPreset]);
+  const canvasSize = useMemo(
+    () => resolveCanvasSize(canvasPreset, canvasOrientation),
+    [canvasPreset, canvasOrientation]
+  );
+  const canvasViewportLabel = `${canvasPreset.viewportLabel}_${canvasOrientation.toUpperCase()}`;
+  const gridMetrics = useMemo(() => getGridMetrics(canvasSize), [canvasSize]);
+  const workspaceRef = useRef<HTMLElement>(null);
   
   // AI Panel 显示状态
   const [showAIPanel, setShowAIPanel] = useState(false);
@@ -171,6 +192,24 @@ export default function App() {
     startH: number
   } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
+
+  const fitCanvasToViewport = useCallback(() => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+
+    const styles = window.getComputedStyle(workspace);
+    const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+    const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+    const availableWidth = workspace.clientWidth - horizontalPadding - 64;
+    const availableHeight = workspace.clientHeight - verticalPadding - 96;
+    const nextZoom = Math.min(
+      availableWidth / canvasSize.width,
+      availableHeight / canvasSize.height,
+      1.15
+    );
+
+    setZoom(Math.max(0.18, Math.min(nextZoom, 1.5)));
+  }, [canvasSize.height, canvasSize.width]);
 
   // Selected block data
   const selectedBlock = useMemo(() => 
@@ -207,6 +246,20 @@ export default function App() {
     if (remember) rememberBlocks();
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
   };
+
+  const selectCanvasPreset = (preset: typeof CANVAS_PRESETS[number]) => {
+    setCanvasPresetId(preset.id);
+    setCanvasOrientation(preset.defaultOrientation);
+  };
+
+  useEffect(() => {
+    fitCanvasToViewport();
+  }, [fitCanvasToViewport, showAIPanel]);
+
+  useEffect(() => {
+    window.addEventListener('resize', fitCanvasToViewport);
+    return () => window.removeEventListener('resize', fitCanvasToViewport);
+  }, [fitCanvasToViewport]);
 
   const addBlock = (name: string, category: LayoutBlock['category'], type: LayoutBlock['type'] = 'container') => {
     rememberBlocks();
@@ -477,13 +530,13 @@ export default function App() {
   const exportSVG = () => {
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('width', String(canvasPreset.width));
-    svg.setAttribute('height', String(canvasPreset.height));
-    svg.setAttribute('viewBox', `0 0 ${canvasPreset.width} ${canvasPreset.height}`);
+    svg.setAttribute('width', String(canvasSize.width));
+    svg.setAttribute('height', String(canvasSize.height));
+    svg.setAttribute('viewBox', `0 0 ${canvasSize.width} ${canvasSize.height}`);
     svg.setAttribute('xmlns', svgNS);
     const bg = document.createElementNS(svgNS, 'rect');
-    bg.setAttribute('width', String(canvasPreset.width));
-    bg.setAttribute('height', String(canvasPreset.height));
+    bg.setAttribute('width', String(canvasSize.width));
+    bg.setAttribute('height', String(canvasSize.height));
     bg.setAttribute('fill', '#ffffff');
     svg.appendChild(bg);
     blocks.forEach(block => {
@@ -632,7 +685,7 @@ export default function App() {
     const blob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
-    a.download = `gridsys_layout_${canvasPreset.viewportLabel.toLowerCase()}.svg`; a.click();
+    a.download = `gridsys_layout_${canvasViewportLabel.toLowerCase()}.svg`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -650,7 +703,7 @@ export default function App() {
 你的任务是根据用户的描述和 Moodboard 参考图，生成一个适合的网格排版布局。
 
 网格系统规格：
-- 当前画布：${canvasPreset.viewportLabel}，${canvasPreset.width}px × ${canvasPreset.height}px
+- 当前画布：${canvasViewportLabel}，${canvasSize.width}px × ${canvasSize.height}px
 - 画布网格：12列 × 8行
 - 当前每列宽：${gridMetrics.colWidth.toFixed(2)}px，每行高：${gridMetrics.rowHeight.toFixed(2)}px，间距：12px
 - 坐标从 (0,0) 开始，x 最大 11，y 最大 7
@@ -755,7 +808,7 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
               <Undo2 size={13} strokeWidth={3} />
               UNDO
             </button>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button 
                 onClick={() => handleZoom(-0.05)}
                 className="hover:text-swiss-red transition-colors"
@@ -771,14 +824,21 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
               >
                 <Plus size={12} strokeWidth={4} />
               </button>
+              <button
+                onClick={fitCanvasToViewport}
+                className="px-2 py-1 border border-white/15 text-white/60 hover:text-white hover:border-swiss-red transition-colors"
+                title="Fit canvas to screen"
+              >
+                FIT
+              </button>
             </div>
             <div className="flex items-center gap-2">
-              <span>VIEWPORT: {canvasPreset.viewportLabel}</span>
+              <span>VIEWPORT: {canvasViewportLabel}</span>
               <div className="flex border border-white/15 bg-white/5">
                 {CANVAS_PRESETS.map(preset => (
                   <button
                     key={preset.id}
-                    onClick={() => setCanvasPresetId(preset.id)}
+                    onClick={() => selectCanvasPreset(preset)}
                     className={`px-2.5 py-1 text-[10px] font-black font-mono transition-colors ${
                       canvasPresetId === preset.id
                         ? 'bg-swiss-red text-white'
@@ -787,6 +847,25 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
                     title={`${preset.viewportLabel} ${preset.width}x${preset.height}px`}
                   >
                     {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex border border-white/15 bg-white/5">
+                {[
+                  { value: 'landscape' as const, label: 'H' },
+                  { value: 'portrait' as const, label: 'V' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => setCanvasOrientation(option.value)}
+                    className={`px-2 py-1 text-[10px] font-black font-mono transition-colors ${
+                      canvasOrientation === option.value
+                        ? 'bg-swiss-red text-white'
+                        : 'text-white/55 hover:text-white hover:bg-white/10'
+                    }`}
+                    title={option.value === 'landscape' ? '横放' : '竖放'}
+                  >
+                    {option.label}
                   </button>
                 ))}
               </div>
@@ -868,19 +947,33 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
 
       {/* Main Workspace Area */}
       <main 
+        ref={workspaceRef}
         className="flex-1 flex items-center justify-center pt-[52px] pl-[220px] pr-[260px] overflow-scroll scrollbar-hide bg-swiss-grey-canvas"
         onMouseDown={() => selectOnly(null)}
       >
         <div 
-          style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
-          className="transition-transform duration-300 ease-out py-20"
+          style={{
+            width: canvasSize.width * zoom,
+            height: canvasSize.height * zoom,
+          }}
+          className="relative flex-shrink-0 transition-[width,height] duration-300 ease-out"
         >
           {/* Frame Workspace */}
           <div 
-            className="relative shadow-2xl bg-white overflow-hidden"
-            style={{ width: canvasPreset.width, height: canvasPreset.height }}
+            className="absolute left-0 top-0 shadow-2xl bg-white overflow-hidden transition-transform duration-300 ease-out"
+            style={{
+              width: canvasSize.width,
+              height: canvasSize.height,
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left'
+            }}
           >
-            <GridView showGrid={showGrid} preset={canvasPreset} metrics={gridMetrics} />
+            <GridView
+              showGrid={showGrid}
+              label={canvasPreset.label}
+              size={canvasSize}
+              metrics={gridMetrics}
+            />
             
             {/* Isolated Safe Area Wrapper: The strict bounding box */}
             <div 
@@ -1199,14 +1292,14 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
           <div className="flex items-center justify-between mb-3">
             <h2 className="section-label !mb-0">Canvas Size</h2>
             <span className="font-mono text-[9px] font-bold text-swiss-red">
-              {canvasPreset.width}x{canvasPreset.height}
+              {canvasSize.width}x{canvasSize.height}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-1">
             {CANVAS_PRESETS.map(preset => (
               <button
                 key={preset.id}
-                onClick={() => setCanvasPresetId(preset.id)}
+                onClick={() => selectCanvasPreset(preset)}
                 className={`px-2 py-2 border text-[10px] font-black font-mono uppercase transition-all ${
                   canvasPresetId === preset.id
                     ? 'bg-swiss-red text-white border-swiss-red'
@@ -1223,6 +1316,31 @@ category 只能是: Generic | Define | Ideation | Prototype | Final
               </button>
             ))}
           </div>
+          <div className="grid grid-cols-2 gap-1 mt-2">
+            {[
+              { value: 'landscape' as const, label: '横放', icon: 'H' },
+              { value: 'portrait' as const, label: '竖放', icon: 'V' },
+            ].map(option => (
+              <button
+                key={option.value}
+                onClick={() => setCanvasOrientation(option.value)}
+                className={`px-2 py-2 border text-[10px] font-black uppercase transition-all ${
+                  canvasOrientation === option.value
+                    ? 'bg-swiss-black text-white border-swiss-black'
+                    : 'bg-white text-swiss-black border-swiss-black/10 hover:border-swiss-red hover:text-swiss-red'
+                }`}
+              >
+                <span className="font-mono mr-1">{option.icon}</span>
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={fitCanvasToViewport}
+            className="mt-2 w-full py-2 bg-white border border-swiss-black/10 text-[10px] font-black font-mono uppercase tracking-widest hover:bg-swiss-red hover:text-white hover:border-swiss-red transition-all"
+          >
+            Fit To View
+          </button>
         </div>
 
         <div className="mb-6">
@@ -1750,11 +1868,13 @@ function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBl
 
 function GridView({
   showGrid,
-  preset,
+  label,
+  size,
   metrics
 }: {
   showGrid: boolean;
-  preset: typeof CANVAS_PRESETS[number];
+  label: string;
+  size: { width: number; height: number };
   metrics: ReturnType<typeof getGridMetrics>;
 }) {
   if (!showGrid) return null;
@@ -1781,8 +1901,8 @@ function GridView({
         ))}
       </div>
       <div className="absolute top-4 left-4 font-mono text-[8px] text-swiss-red/40 flex gap-4 uppercase font-bold">
-        <span>Canvas: {preset.label}</span>
-        <span>Resolution: {preset.width}x{preset.height}</span>
+        <span>Canvas: {label}</span>
+        <span>Resolution: {size.width}x{size.height}</span>
       </div>
       <div className="absolute bottom-4 left-4 font-mono text-[8px] text-swiss-red/40 flex gap-4 uppercase font-bold">
         <span>Modular: {COLUMNS}x{ROWS}</span>
