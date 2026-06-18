@@ -13,6 +13,7 @@ export interface LayoutBlock {
   h: number; // grid row span
   content?: string;
   category: 'Define' | 'Ideation' | 'Prototype' | 'Final' | 'Generic';
+  assetId?: string;
   imageUrl?: string;
   imageFit?: 'cover' | 'contain';
   imageZoom?: number;
