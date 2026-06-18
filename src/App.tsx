@@ -50,9 +50,28 @@ const GUTTER = 12;
 type CanvasPresetId = 'digital-16-9' | 'strip-1800-768' | 'a3' | 'a4';
 type CanvasOrientation = 'landscape' | 'portrait';
 type LayoutMode = 'strict' | 'editorial';
+type ImageAssetRole = 'hero' | 'support' | 'texture' | 'reference';
+type TextAssetRole = 'title' | 'subtitle' | 'body' | 'caption' | 'label';
+
+type ImageAsset = {
+  id: string;
+  name: string;
+  dataUrl: string;
+  role: ImageAssetRole;
+  width?: number;
+  height?: number;
+};
+
+type TextAsset = {
+  id: string;
+  label: string;
+  content: string;
+  role: TextAssetRole;
+};
 
 const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
 const isTextBlock = (type: LayoutBlock['type']) => TEXT_BLOCK_TYPES.includes(type);
+const createLocalId = () => Math.random().toString(36).slice(2, 10);
 
 const CANVAS_PRESETS: Array<{
   id: CanvasPresetId;
@@ -171,15 +190,13 @@ export default function App() {
   const gridMetrics = useMemo(() => getGridMetrics(canvasSize), [canvasSize]);
   const workspaceRef = useRef<HTMLElement>(null);
   
-  // AI Panel 显示状态
-  const [showAIPanel, setShowAIPanel] = useState(false);
-  // Moodboard 图片列表（base64）
-  const [moodImages, setMoodImages] = useState<string[]>([]);
-  // Chat 消息记录
+  // 素材池与 AI 生成状态
+  const [imageAssets, setImageAssets] = useState<ImageAsset[]>([]);
+  const [textAssets, setTextAssets] = useState<TextAsset[]>([]);
+  const [newTextAsset, setNewTextAsset] = useState('');
+  const [newTextRole, setNewTextRole] = useState<TextAssetRole>('body');
   const [chatMessages, setChatMessages] = useState<{role:'user'|'ai', text:string}[]>([]);
-  // Chat 输入框内容
   const [chatInput, setChatInput] = useState('');
-  // AI 加载状态
   const [aiLoading, setAiLoading] = useState(false);
   
   // Drag State
@@ -263,7 +280,7 @@ export default function App() {
 
   useEffect(() => {
     fitCanvasToViewport();
-  }, [fitCanvasToViewport, showAIPanel]);
+  }, [fitCanvasToViewport]);
 
   useEffect(() => {
     window.addEventListener('resize', fitCanvasToViewport);
@@ -746,14 +763,67 @@ export default function App() {
     setZoom(prev => Math.min(Math.max(prev + delta, 0.4), 1.5));
   };
 
+  const handleImageAssetUpload = (files: FileList | File[]) => {
+    const nextFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+    nextFiles.slice(0, Math.max(0, 10 - imageAssets.length)).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        const image = new Image();
+        image.onload = () => {
+          setImageAssets(prev => [
+            ...prev,
+            {
+              id: createLocalId(),
+              name: file.name.replace(/\.[^.]+$/, ''),
+              dataUrl,
+              role: prev.length === 0 ? 'hero' : 'support',
+              width: image.naturalWidth,
+              height: image.naturalHeight
+            }
+          ]);
+        };
+        image.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const addTextAsset = () => {
+    const content = newTextAsset.trim();
+    if (!content) return;
+    setTextAssets(prev => [
+      ...prev,
+      {
+        id: createLocalId(),
+        label: `${newTextRole.toUpperCase()} ${prev.length + 1}`,
+        content,
+        role: newTextRole
+      }
+    ]);
+    setNewTextAsset('');
+  };
+
   const callGeminiLayout = async (userMessage: string) => {
     setAiLoading(true);
     setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setChatInput('');
 
     try {
+      const imageManifest = imageAssets.map(asset => ({
+        id: asset.id,
+        name: asset.name,
+        role: asset.role,
+        size: asset.width && asset.height ? `${asset.width}x${asset.height}` : 'unknown'
+      }));
+      const textManifest = textAssets.map(asset => ({
+        id: asset.id,
+        role: asset.role,
+        content: asset.content
+      }));
+
       const systemPrompt = `你是一个专业的 Swiss Design 排版系统。
-你的任务是根据用户的描述和 Moodboard 参考图，生成一个适合的网格排版布局。
+你的任务是根据用户的描述、图片素材池和文本素材池，生成一个适合的网格排版布局。
 
 网格系统规格：
 - 当前画布：${canvasViewportLabel}，${canvasSize.width}px × ${canvasSize.height}px
@@ -761,15 +831,22 @@ export default function App() {
 - 当前每列宽：${gridMetrics.colWidth.toFixed(2)}px，每行高：${gridMetrics.rowHeight.toFixed(2)}px，间距：12px
 - 坐标从 (0,0) 开始，x 最大 11，y 最大 7
 
+图片素材池：
+${JSON.stringify(imageManifest, null, 2)}
+
+文本素材池：
+${JSON.stringify(textManifest, null, 2)}
+
 你必须只输出一个合法的 JSON 对象，不要有任何其他文字、解释或 markdown 代码块。
 格式如下：
 {
   "blocks": [
-    { "type": "title", "label": "标题文字", "x": 0, "y": 0, "w": 8, "h": 1, "category": "Generic" },
-    { "type": "image", "label": "IMAGE", "x": 0, "y": 1, "w": 6, "h": 5, "category": "Generic" },
+    { "type": "title", "label": "标题文字", "assetId": "文本素材id，可选", "x": 0, "y": 0, "w": 8, "h": 1, "category": "Generic" },
+    { "type": "image", "label": "IMAGE", "assetId": "图片素材id，可选", "x": 0, "y": 1, "w": 6, "h": 5, "category": "Generic" },
     {
       "type": "text",
       "label": "描述文字",
+      "assetId": "文本素材id，可选",
       "x": 6,
       "y": 1,
       "w": 6,
@@ -787,28 +864,18 @@ export default function App() {
 type 只能是: container | text | heading | image | title
 category 只能是: Generic | Define | Ideation | Prototype | Final
 overflowMode 只能是: clip | visible | autoHeight
+如果要使用素材池里的图片或文字，必须在 block 中写入对应的 assetId。
+图片 block 优先使用图片素材池；title/heading/text 优先使用文本素材池。
 当需要杂志式图文叠压时，可以让文字 block 与图片 block 重叠，并提高文字的 zIndex。
 确保所有 block 不超出边界：x + w <= 12，y + h <= 8
 `;
 
       const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const modelName = moodImages.length > 0 
-        ? 'gemini-3.1-pro-preview' 
-        : 'gemini-3-flash-preview';
-
-      const imageParts = moodImages.map(base64 => ({
-        inlineData: {
-          mimeType: 'image/jpeg' as const,
-          data: base64.split(',')[1] // 去掉 data:image/jpeg;base64, 前缀
-        }
-      }));
 
       const response = await ai.models.generateContent({
-        model: modelName,
+        model: 'gemini-3-flash-preview',
         contents: [
-          ...imageParts,
           { text: userMessage }
         ],
         config: {
@@ -822,27 +889,40 @@ overflowMode 只能是: clip | visible | autoHeight
       const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
 
       if (parsed.blocks && Array.isArray(parsed.blocks)) {
-        const newBlocks: LayoutBlock[] = parsed.blocks.map((b: any, index: number) => ({
-          id: Math.random().toString(36).substr(2, 9),
-          type: b.type || 'container',
-          label: (b.label || 'BLOCK').toUpperCase(),
-          x: Math.max(0, Math.min(11, b.x || 0)),
-          y: Math.max(0, Math.min(7, b.y || 0)),
-          w: Math.max(1, Math.min(12, b.w || 2)),
-          h: Math.max(1, Math.min(8, b.h || 2)),
-          category: b.category || 'Generic',
-          imageFit: 'cover', imageZoom: 1, imagePanX: 0, imagePanY: 0,
-          fontSize: b.type === 'text' || b.type === 'heading' || b.type === 'title' ? 12 : undefined,
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: b.type === 'title' ? 'bold' : 'normal',
-          fontStyle: 'normal',
-          textColor: b.type === 'image' ? undefined : '#111111',
-          backgroundColor: b.backgroundColor || 'transparent',
-          overflowMode: b.overflowMode || (b.type === 'text' || b.type === 'heading' || b.type === 'title' ? 'visible' : 'clip'),
-          padding: typeof b.padding === 'number' ? b.padding : 8,
-          zIndex: typeof b.zIndex === 'number' ? b.zIndex : index + 1,
-          generatedByAI: true
-        }));
+        const newBlocks: LayoutBlock[] = parsed.blocks.map((b: any, index: number) => {
+          const blockType = b.type || 'container';
+          const imageAsset = imageAssets.find(asset => asset.id === b.assetId);
+          const textAsset = textAssets.find(asset => asset.id === b.assetId);
+          const isGeneratedText = isTextBlock(blockType);
+          const resolvedLabel = textAsset?.content || b.label || (blockType === 'image' ? 'IMAGE' : 'BLOCK');
+
+          return {
+            id: createLocalId(),
+            type: blockType,
+            label: isGeneratedText ? resolvedLabel : resolvedLabel.toUpperCase(),
+            x: Math.max(0, Math.min(11, b.x || 0)),
+            y: Math.max(0, Math.min(7, b.y || 0)),
+            w: Math.max(1, Math.min(12, b.w || 2)),
+            h: Math.max(1, Math.min(8, b.h || 2)),
+            category: b.category || 'Generic',
+            assetId: b.assetId,
+            imageUrl: blockType === 'image' ? imageAsset?.dataUrl : undefined,
+            imageFit: 'cover',
+            imageZoom: 1,
+            imagePanX: 0,
+            imagePanY: 0,
+            fontSize: isGeneratedText ? (blockType === 'title' ? 28 : blockType === 'heading' ? 18 : 12) : undefined,
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: blockType === 'title' || blockType === 'heading' ? 'bold' : 'normal',
+            fontStyle: 'normal',
+            textColor: blockType === 'image' ? undefined : '#111111',
+            backgroundColor: b.backgroundColor || 'transparent',
+            overflowMode: b.overflowMode || (isGeneratedText ? 'visible' : 'clip'),
+            padding: typeof b.padding === 'number' ? b.padding : 8,
+            zIndex: typeof b.zIndex === 'number' ? b.zIndex : index + 1,
+            generatedByAI: true
+          };
+        });
 
         rememberBlocks();
         setBlocks(settleBlocks(newBlocks));
@@ -979,17 +1059,6 @@ overflowMode 只能是: clip | visible | autoHeight
               />
             </div>
           </div>
-          
-          <button
-            onClick={() => setShowAIPanel(!showAIPanel)}
-            className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-all border ${
-              showAIPanel
-                ? 'bg-swiss-red text-white border-swiss-red'
-                : 'bg-transparent text-white/70 border-white/20 hover:border-swiss-red hover:text-swiss-red'
-            }`}
-          >
-            AI STUDIO
-          </button>
           <button
             onClick={() => setShowGuide(true)}
             className="flex items-center gap-1 text-white/60 hover:text-white transition-colors"
@@ -1006,7 +1075,7 @@ overflowMode 只能是: clip | visible | autoHeight
       </nav>
 
       {/* Sidebar Left: Library */}
-      <aside className="fixed left-0 top-[52px] bottom-0 w-[220px] glass-panel z-40 p-6 flex flex-col overflow-hidden">
+      <aside className="fixed left-0 top-[52px] bottom-0 w-[300px] glass-panel z-40 flex flex-col overflow-hidden">
         <div className="p-4 border-b border-swiss-black/5 bg-white/50">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-[11px] font-extrabold uppercase tracking-widest text-swiss-black/40">Components</h2>
@@ -1025,6 +1094,154 @@ overflowMode 只能是: clip | visible | autoHeight
             items={['Text Block', 'Image Block', 'Blank Block']} 
             onAdd={(item) => addBlock(item, 'Generic', item === 'Image Block' ? 'image' : item === 'Text Block' ? 'text' : 'blank')}
           />
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-swiss-black/60">
+                <ImageIcon size={13} />
+                Image Assets
+              </div>
+              <span className="font-mono text-[9px] text-swiss-black/35">{imageAssets.length}/10</span>
+            </div>
+            <button
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.multiple = true;
+                input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || []);
+                input.click();
+              }}
+              className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
+            >
+              <Upload size={13} />
+              Upload Images
+            </button>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {imageAssets.map(asset => (
+                <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
+                  <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
+                  <button
+                    onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                    className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    title="Remove image"
+                  >
+                    <X size={12} />
+                  </button>
+                  <select
+                    value={asset.role}
+                    onChange={(event) => setImageAssets(prev => prev.map(item => (
+                      item.id === asset.id ? { ...item, role: event.target.value as ImageAssetRole } : item
+                    )))}
+                    className="absolute left-1 bottom-1 max-w-[calc(100%-8px)] bg-white/90 border border-swiss-black/15 text-[8px] font-black uppercase outline-none"
+                    title="Image role"
+                  >
+                    <option value="hero">hero</option>
+                    <option value="support">support</option>
+                    <option value="texture">texture</option>
+                    <option value="reference">ref</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-3 text-[10px] font-black uppercase tracking-widest text-swiss-black/60">
+              <Type size={13} />
+              Text Assets
+            </div>
+            <div className="grid grid-cols-5 gap-1 mb-2">
+              {(['title', 'subtitle', 'body', 'caption', 'label'] as TextAssetRole[]).map(role => (
+                <button
+                  key={role}
+                  onClick={() => setNewTextRole(role)}
+                  className={`h-7 text-[8px] font-black uppercase border transition-colors ${
+                    newTextRole === role
+                      ? 'bg-swiss-black text-white border-swiss-black'
+                      : 'bg-white/50 border-swiss-black/10 text-swiss-black/45 hover:text-swiss-red hover:border-swiss-red'
+                  }`}
+                >
+                  {role}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={newTextAsset}
+              onChange={(event) => setNewTextAsset(event.target.value)}
+              placeholder="粘贴标题、正文、说明文字..."
+              className="w-full h-20 resize-none bg-white/70 border border-swiss-black/10 p-2 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-swiss-black/25"
+            />
+            <button
+              onClick={addTextAsset}
+              disabled={!newTextAsset.trim()}
+              className="mt-2 w-full h-8 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
+            >
+              Add Text
+            </button>
+            <div className="mt-3 space-y-2">
+              {textAssets.map(asset => (
+                <div key={asset.id} className="group border border-swiss-black/10 bg-white/60 p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-swiss-red">{asset.role}</span>
+                    <button
+                      onClick={() => setTextAssets(prev => prev.filter(item => item.id !== asset.id))}
+                      className="text-swiss-black/25 hover:text-swiss-red"
+                      title="Remove text"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                  <p className="text-[10px] leading-snug text-swiss-black/70 line-clamp-3 whitespace-pre-wrap">{asset.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-swiss-black/60">
+                <Zap size={13} />
+                AI Insert
+              </div>
+              {aiLoading && <span className="text-[8px] font-mono font-bold text-swiss-red animate-pulse">GENERATING</span>}
+            </div>
+            <textarea
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && chatInput.trim() && !aiLoading) {
+                  callGeminiLayout(chatInput.trim());
+                }
+              }}
+              placeholder="描述想要的排版，例如：主图占左侧，标题压在图片右上，正文放下方..."
+              className="w-full h-24 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
+            />
+            <button
+              onClick={() => chatInput.trim() && !aiLoading && callGeminiLayout(chatInput.trim())}
+              disabled={aiLoading || !chatInput.trim()}
+              className="mt-2 w-full h-9 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
+            >
+              Generate Layout
+            </button>
+            <div className="mt-3 space-y-2">
+              {chatMessages.slice(-3).map((msg, index) => (
+                <div
+                  key={`${msg.role}-${index}-${msg.text.slice(0, 12)}`}
+                  className={`p-2 text-[10px] leading-snug border ${
+                    msg.role === 'user'
+                      ? 'bg-white/60 border-swiss-black/10 text-swiss-black/55'
+                      : 'bg-swiss-red/10 border-swiss-red/20 text-swiss-black/75'
+                  }`}
+                >
+                  <span className="block mb-1 text-[8px] font-black uppercase tracking-widest text-swiss-black/35">
+                    {msg.role === 'user' ? 'Prompt' : 'AI'}
+                  </span>
+                  {msg.text}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="p-4 border-t border-swiss-black/5 bg-swiss-grey-light/30">
@@ -1041,7 +1258,7 @@ overflowMode 只能是: clip | visible | autoHeight
       {/* Main Workspace Area */}
       <main 
         ref={workspaceRef}
-        className="flex-1 flex items-center justify-center pt-[52px] pl-[220px] pr-[260px] overflow-scroll scrollbar-hide bg-swiss-grey-canvas"
+        className="flex-1 flex items-center justify-center pt-[52px] pl-[300px] pr-[260px] overflow-scroll scrollbar-hide bg-swiss-grey-canvas"
         onMouseDown={() => selectOnly(null)}
       >
         <div 
@@ -1302,125 +1519,6 @@ overflowMode 只能是: clip | visible | autoHeight
           </div>
         </div>
       </main>
-
-      {/* AI Layout Studio Panel */}
-      {showAIPanel && (
-        <div className="fixed bottom-0 left-[220px] right-[260px] h-[320px] bg-[#111] border-t border-[#333] z-50 flex flex-col">
-          
-          {/* Panel Header */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-[#333]">
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-white">AI LAYOUT STUDIO</span>
-              <span className="bg-swiss-red text-white px-1.5 py-0.5 text-[9px] font-bold">GEMINI 2.0</span>
-              {aiLoading && <span className="text-[9px] font-mono text-swiss-red animate-pulse">GENERATING...</span>}
-            </div>
-            <button onClick={() => setShowAIPanel(false)} className="text-white/40 hover:text-white text-[11px] font-mono">[ CLOSE ]</button>
-          </div>
-
-          <div className="flex flex-1 overflow-hidden">
-            
-            {/* Left: Moodboard */}
-            <div className="w-[280px] border-r border-[#333] flex flex-col">
-              <div className="px-4 py-2 border-b border-[#333]">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-white/40">Moodboard — 风格参考</span>
-              </div>
-              <div className="flex-1 p-3 overflow-y-auto scrollbar-hide">
-                <div className="grid grid-cols-3 gap-2">
-                  {moodImages.map((img, i) => (
-                    <div key={i} className="relative aspect-square group">
-                      <img src={img} className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => setMoodImages(prev => prev.filter((_, j) => j !== i))}
-                        className="absolute top-0.5 right-0.5 w-4 h-4 bg-swiss-red text-white text-[8px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >✕</button>
-                    </div>
-                  ))}
-                  {moodImages.length < 6 && (
-                    <button
-                      onClick={() => {
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = 'image/*';
-                        input.multiple = true;
-                        input.onchange = (e) => {
-                          const files = Array.from((e.target as HTMLInputElement).files || []);
-                          files.slice(0, 6 - moodImages.length).forEach(file => {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => {
-                              setMoodImages(prev => [...prev, ev.target?.result as string]);
-                            };
-                            reader.readAsDataURL(file);
-                          });
-                        };
-                        input.click();
-                      }}
-                      className="aspect-square border border-dashed border-white/20 flex flex-col items-center justify-center gap-1 hover:border-swiss-red hover:bg-swiss-red/5 transition-all"
-                    >
-                      <span className="text-white/40 text-lg">+</span>
-                      <span className="text-[8px] font-mono text-white/30 uppercase">Add Ref</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Chat */}
-            <div className="flex-1 flex flex-col">
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scrollbar-hide">
-                {chatMessages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full opacity-20 space-y-2">
-                    <span className="text-[10px] font-mono text-white uppercase tracking-widest">描述你想要的排版风格</span>
-                    <span className="text-[9px] font-mono text-white/50">例如：上传参考图，生成一个产品展示排版</span>
-                  </div>
-                )}
-                {chatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] px-3 py-2 text-[11px] font-mono ${
-                      msg.role === 'user'
-                        ? 'bg-swiss-red text-white'
-                        : 'bg-[#222] text-white/80 border border-[#333]'
-                    }`}>
-                      {msg.role === 'ai' && <span className="text-swiss-red text-[9px] block mb-1 font-bold">AI STUDIO</span>}
-                      {msg.text}
-                    </div>
-                  </div>
-                ))}
-                {aiLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-[#222] border border-[#333] px-3 py-2">
-                      <span className="text-swiss-red text-[9px] font-mono animate-pulse">ANALYZING MOODBOARD...</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Input */}
-              <div className="border-t border-[#333] px-4 py-3 flex gap-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && chatInput.trim() && !aiLoading) {
-                      callGeminiLayout(chatInput.trim());
-                    }
-                  }}
-                  placeholder="描述排版风格，例如：大图左侧，文字右侧，简洁留白..."
-                  className="flex-1 bg-[#222] border border-[#333] text-white text-[11px] font-mono px-3 py-2 outline-none focus:border-swiss-red placeholder:text-white/20"
-                />
-                <button
-                  onClick={() => chatInput.trim() && !aiLoading && callGeminiLayout(chatInput.trim())}
-                  disabled={aiLoading || !chatInput.trim()}
-                  className="px-4 py-2 bg-swiss-red text-white text-[11px] font-bold uppercase tracking-widest hover:bg-swiss-red/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                >
-                  GEN
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Sidebar Right: Inspector */}
       <aside className="fixed right-0 top-[52px] bottom-0 w-[260px] glass-panel z-40 p-6 flex flex-col overflow-hidden">
