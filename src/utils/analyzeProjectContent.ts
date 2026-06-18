@@ -8,9 +8,11 @@ export function analyzeProjectContent(userInput: string | ContentJSON): Analysis
     : JSON.stringify(userInput.content || {});
   const text = rawText.toLowerCase();
 
-  const detectedStage = keywordIncludes(text, ['prototype', 'testing', 'function', 'interaction', 'material', 'develop'])
-    ? 'develop'
-    : 'discover';
+  const detectedStage = keywordIncludes(text, ['deliver', 'final outcome', 'final design', 'showcase', 'participant', 'feedback', 'validation'])
+    ? 'deliver'
+    : keywordIncludes(text, ['prototype', 'testing', 'function', 'interaction', 'material', 'develop'])
+      ? 'develop'
+      : 'discover';
 
   const contentTypesFound = [
     keywordIncludes(text, ['background', 'context', 'problem', 'why', 'research']) && 'background_summary',
@@ -24,9 +26,11 @@ export function analyzeProjectContent(userInput: string | ContentJSON): Analysis
 
   return {
     detectedStage,
-    detectedPageType: detectedStage === 'develop'
-      ? 'prototype_function_testing'
-      : 'context_research_overview',
+    detectedPageType: detectedStage === 'deliver'
+      ? 'final_outcome_and_validation_summary'
+      : detectedStage === 'develop'
+        ? 'prototype_function_testing'
+        : 'context_research_overview',
     contentTypesFound,
     missingContent: [
       !contentTypesFound.includes('research_question') && detectedStage === 'discover' ? 'research_question' : '',

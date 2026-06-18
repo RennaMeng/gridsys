@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 
-const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9'];
+const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9', 'deliver_final_outcome_16x9'];
 
 const loadTemplate = async (templateId) => {
   const filePath = path.join(process.cwd(), 'public', 'templates', `${templateId}.json`);
@@ -14,9 +14,11 @@ const keywordIncludes = (text, keywords) => keywords.some(keyword => text.includ
 
 const analyzeProjectContent = (prompt, textAssets = []) => {
   const text = [prompt, ...textAssets.map(asset => asset.content || '')].join('\n').toLowerCase();
-  const detectedStage = keywordIncludes(text, ['prototype', 'testing', 'function', 'interaction', 'material', 'develop'])
-    ? 'develop'
-    : 'discover';
+  const detectedStage = keywordIncludes(text, ['deliver', 'final outcome', 'final design', 'showcase', 'participant', 'feedback', 'validation'])
+    ? 'deliver'
+    : keywordIncludes(text, ['prototype', 'testing', 'function', 'interaction', 'material', 'develop'])
+      ? 'develop'
+      : 'discover';
   const contentTypesFound = [
     keywordIncludes(text, ['background', 'context', 'problem', 'why', 'research']) && 'background_summary',
     keywordIncludes(text, ['trend', 'forecast', 'market']) && 'trend_data',
@@ -29,7 +31,11 @@ const analyzeProjectContent = (prompt, textAssets = []) => {
 
   return {
     detectedStage,
-    detectedPageType: detectedStage === 'develop' ? 'prototype_function_testing' : 'context_research_overview',
+    detectedPageType: detectedStage === 'deliver'
+      ? 'final_outcome_and_validation_summary'
+      : detectedStage === 'develop'
+        ? 'prototype_function_testing'
+        : 'context_research_overview',
     contentTypesFound
   };
 };
@@ -71,6 +77,10 @@ const fallbackContentForSlot = (slotId, contentJSON) => {
     research_question: content.research_question || 'How might we frame the opportunity?',
     context_text: content.context_text || content.background_summary || '',
     function_text: content.function_text || content.usage_text || '',
+    participant_a_feedback: content.participant_a_feedback || content.feedback_a || '',
+    participant_b_feedback: content.participant_b_feedback || content.feedback_b || '',
+    participant_c_feedback: content.participant_c_feedback || content.feedback_c || '',
+    participant_d_feedback: content.participant_d_feedback || content.feedback_d || '',
     prototype_annotation: 'FUNCTION / USAGE',
     mapping_annotation: 'RESEARCH / CONTEXT MAP',
     key_statistic: content.key_statistic || ''
@@ -86,7 +96,18 @@ const fallbackAssetForSlot = (slotId, contentJSON, imageAssets) => {
     hero_usage_image: content.hero_usage_image || content.main_usage_image,
     secondary_usage_image: content.secondary_usage_image,
     component_image: content.component_image,
-    material_detail_image: content.material_detail_image
+    material_detail_image: content.material_detail_image,
+    hero_outcome_image: content.hero_outcome_image || content.hero_usage_image || content.main_usage_image,
+    component_spread_image: content.component_spread_image || content.component_image,
+    testing_image_a: content.testing_image_a || content.secondary_usage_image,
+    testing_image_b: content.testing_image_b || content.material_detail_image,
+    scenario_image_foot: content.scenario_image_foot || content.secondary_usage_image,
+    scenario_image_hands: content.scenario_image_hands || content.component_image,
+    scenario_image_arm: content.scenario_image_arm || content.material_detail_image,
+    module_card_foot: content.module_card_foot || content.component_image,
+    module_card_hands: content.module_card_hands || content.material_detail_image,
+    module_card_arm: content.module_card_arm || content.context_visual,
+    diagram_overlay_image: content.diagram_overlay_image || content.module_card_arm
   };
 
   return fallbackMap[slotId] || imageAssets[0]?.id;
@@ -208,6 +229,7 @@ Slot assignment rules:
 - Optional slots may be hidden with visible false when they do not help the narrative.
 - Discover pages explain why the problem or opportunity exists.
 - Develop pages explain how the prototype works.
+- Deliver pages present the final outcome, validation feedback, usage scenarios, and component system.
 - Preserve narrative hierarchy from the template.
 - Shorten or structure long text so it fits naturally. Do not cram paragraphs into small slots.
 - Do not include project-specific facts that were not supplied by the user or assets.

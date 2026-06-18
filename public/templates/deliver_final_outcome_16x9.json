@@ -1,0 +1,392 @@
+{
+  "templateMeta": {
+    "templateId": "deliver_final_outcome_16x9",
+    "templateName": "Deliver Final Outcome",
+    "pageType": "deliver",
+    "doubleDiamondStage": "deliver",
+    "layoutPurpose": "final_outcome_and_validation_summary",
+    "narrativeRole": "present_final_design_outcome_with_user_feedback_and_usage_scenarios",
+    "suitableFor": [
+      "final outcome",
+      "product showcase",
+      "user testing results",
+      "participant feedback",
+      "usage scenario display",
+      "component system display",
+      "final design presentation"
+    ]
+  },
+  "canvas": {
+    "ratio": "16:9",
+    "width": 1920,
+    "height": 1080,
+    "orientation": "landscape",
+    "safeMargin": {
+      "top": 48,
+      "right": 48,
+      "bottom": 48,
+      "left": 48
+    }
+  },
+  "grid": {
+    "type": "deliver_outcome_showcase_grid",
+    "columns": 12,
+    "rows": 8,
+    "columnGap": 12,
+    "rowGap": 12,
+    "layoutDensity": "high",
+    "alignment": "asymmetric_showcase",
+    "coordinateSystem": "12x8_grid"
+  },
+  "elements": [
+    {
+      "slotId": "page_title",
+      "type": "text",
+      "role": "title",
+      "x": 0,
+      "y": 0,
+      "w": 5,
+      "h": 1,
+      "style": "title",
+      "zIndex": 4,
+      "required": true
+    },
+    {
+      "slotId": "participant_a_feedback",
+      "type": "caption",
+      "role": "participant_feedback",
+      "x": 0,
+      "y": 1,
+      "w": 3,
+      "h": 1,
+      "style": "caption",
+      "zIndex": 4,
+      "required": false
+    },
+    {
+      "slotId": "participant_b_feedback",
+      "type": "caption",
+      "role": "participant_feedback",
+      "x": 3,
+      "y": 1,
+      "w": 2,
+      "h": 1,
+      "style": "caption",
+      "zIndex": 4,
+      "required": false
+    },
+    {
+      "slotId": "testing_image_a",
+      "type": "image",
+      "role": "testing_documentation",
+      "x": 0,
+      "y": 2,
+      "w": 3,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "testing_image_b",
+      "type": "image",
+      "role": "testing_documentation",
+      "x": 3,
+      "y": 2,
+      "w": 2,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "participant_c_feedback",
+      "type": "caption",
+      "role": "participant_feedback",
+      "x": 0,
+      "y": 3,
+      "w": 3,
+      "h": 1,
+      "style": "caption",
+      "zIndex": 4,
+      "required": false
+    },
+    {
+      "slotId": "participant_d_feedback",
+      "type": "caption",
+      "role": "participant_feedback",
+      "x": 3,
+      "y": 3,
+      "w": 2,
+      "h": 1,
+      "style": "caption",
+      "zIndex": 4,
+      "required": false
+    },
+    {
+      "slotId": "component_spread_image",
+      "type": "image",
+      "role": "final_component_spread",
+      "x": 0,
+      "y": 4,
+      "w": 5,
+      "h": 4,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": true
+    },
+    {
+      "slotId": "hero_outcome_image",
+      "type": "image",
+      "role": "final_outcome_hero",
+      "x": 5,
+      "y": 0,
+      "w": 7,
+      "h": 5,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": true
+    },
+    {
+      "slotId": "diagram_overlay_image",
+      "type": "image",
+      "role": "system_diagram_overlay",
+      "x": 10,
+      "y": 1,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "crop": "contain",
+      "zIndex": 5,
+      "required": false
+    },
+    {
+      "slotId": "scenario_image_foot",
+      "type": "image",
+      "role": "usage_scenario",
+      "x": 5,
+      "y": 5,
+      "w": 2,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "scenario_image_hands",
+      "type": "image",
+      "role": "usage_scenario",
+      "x": 7,
+      "y": 5,
+      "w": 3,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "scenario_image_arm",
+      "type": "image",
+      "role": "usage_scenario",
+      "x": 10,
+      "y": 5,
+      "w": 2,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "module_card_foot",
+      "type": "image",
+      "role": "module_diagram",
+      "x": 5,
+      "y": 6,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "crop": "contain",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "module_card_hands",
+      "type": "image",
+      "role": "module_diagram",
+      "x": 7,
+      "y": 6,
+      "w": 3,
+      "h": 2,
+      "style": "image",
+      "crop": "contain",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "module_card_arm",
+      "type": "image",
+      "role": "module_diagram",
+      "x": 10,
+      "y": 6,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "crop": "contain",
+      "zIndex": 1,
+      "required": false
+    }
+  ],
+  "contentRequirements": {
+    "required": [
+      "page_title",
+      "hero_outcome_image",
+      "component_spread_image"
+    ],
+    "optional": [
+      "participant_feedback",
+      "testing_images",
+      "usage_scenario_images",
+      "module_diagrams",
+      "system_diagram_overlay"
+    ]
+  },
+  "slots": {
+    "textSlots": [
+      {
+        "id": "page_title",
+        "role": "title",
+        "required": true,
+        "maxLines": 1,
+        "fontStyle": "bold_italic"
+      },
+      {
+        "id": "participant_a_feedback",
+        "role": "participant_feedback",
+        "required": false,
+        "maxWords": 28,
+        "fontSizeLevel": "small"
+      },
+      {
+        "id": "participant_b_feedback",
+        "role": "participant_feedback",
+        "required": false,
+        "maxWords": 28,
+        "fontSizeLevel": "small"
+      },
+      {
+        "id": "participant_c_feedback",
+        "role": "participant_feedback",
+        "required": false,
+        "maxWords": 28,
+        "fontSizeLevel": "small"
+      },
+      {
+        "id": "participant_d_feedback",
+        "role": "participant_feedback",
+        "required": false,
+        "maxWords": 28,
+        "fontSizeLevel": "small"
+      }
+    ],
+    "imageSlots": [
+      {
+        "id": "hero_outcome_image",
+        "role": "final_outcome_hero",
+        "required": true,
+        "priority": "highest",
+        "contentType": "hero_render_or_final_photo",
+        "cropStyle": "wide_landscape"
+      },
+      {
+        "id": "component_spread_image",
+        "role": "final_component_spread",
+        "required": true,
+        "priority": "high",
+        "contentType": "component_photo",
+        "cropStyle": "wide_landscape"
+      },
+      {
+        "id": "testing_image_a",
+        "role": "testing_documentation",
+        "required": false,
+        "priority": "medium",
+        "contentType": "testing_photo",
+        "cropStyle": "landscape"
+      },
+      {
+        "id": "scenario_image_foot",
+        "role": "usage_scenario",
+        "required": false,
+        "priority": "medium",
+        "contentType": "scenario_photo",
+        "cropStyle": "landscape"
+      },
+      {
+        "id": "module_card_foot",
+        "role": "module_diagram",
+        "required": false,
+        "priority": "medium",
+        "contentType": "diagram_or_render",
+        "cropStyle": "contain"
+      }
+    ]
+  },
+  "styleRules": {
+    "background": "warm_white",
+    "visualDensity": "high",
+    "layoutStyle": "final_outcome_board",
+    "imageStyle": "large_hero_plus_documentation_grid",
+    "typography": {
+      "title": "bold_italic",
+      "participantLabel": "bold_accent",
+      "quote": "regular",
+      "moduleLabel": "italic"
+    },
+    "colorTokens": {
+      "background": "var(--background)",
+      "text": "var(--text)",
+      "accent": "var(--accent)",
+      "mutedText": "var(--muted-text)"
+    }
+  },
+  "aiGenerationRules": {
+    "mainLogic": "show_final_design_outcome_and_evidence_that_it_works",
+    "layoutLogic": "left_validation_right_final_showcase",
+    "imageHierarchy": "hero_outcome_image_first_component_spread_second",
+    "textHierarchy": "title_participant_feedback",
+    "prioritizeHeroOutcome": true,
+    "prioritizeValidationEvidence": true,
+    "allowDenseDocumentationGrid": true,
+    "avoid": [
+      "early research framing",
+      "prototype-only process explanation",
+      "making testing photos larger than final outcome hero"
+    ],
+    "recommendedFor": [
+      "final outcome",
+      "deliver stage",
+      "user testing results",
+      "product showcase",
+      "component system display"
+    ]
+  },
+  "layoutVariants": [
+    {
+      "variantId": "deliver_feedback_and_final_showcase",
+      "layoutLogic": "left_feedback_grid_right_hero_and_scenario_cards",
+      "bestFor": [
+        "final product presentation",
+        "participant validation",
+        "usage scenario documentation",
+        "modular product system"
+      ]
+    }
+  ]
+}

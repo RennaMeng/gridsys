@@ -91,7 +91,7 @@ const CANVAS_PRESETS: Array<{
   { id: 'a4', label: 'A4', viewportLabel: 'A4_PRINT', width: 794, height: 1123, defaultOrientation: 'portrait' },
 ];
 
-const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9'];
+const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9', 'deliver_final_outcome_16x9'];
 
 const resolveCanvasSize = (
   preset: typeof CANVAS_PRESETS[number],
@@ -852,7 +852,22 @@ export default function App() {
         main_usage_image: heroImage?.id,
         secondary_usage_image: supportImages[0]?.id,
         component_image: supportImages[1]?.id || supportImages[0]?.id,
-        material_detail_image: supportImages[2]?.id || supportImages[1]?.id
+        material_detail_image: supportImages[2]?.id || supportImages[1]?.id,
+        hero_outcome_image: heroImage?.id,
+        component_spread_image: supportImages[0]?.id || heroImage?.id,
+        testing_image_a: supportImages[1]?.id || heroImage?.id,
+        testing_image_b: supportImages[2]?.id || supportImages[0]?.id,
+        scenario_image_foot: supportImages[3]?.id || supportImages[0]?.id,
+        scenario_image_hands: supportImages[4]?.id || supportImages[1]?.id,
+        scenario_image_arm: supportImages[5]?.id || supportImages[2]?.id,
+        module_card_foot: supportImages[6]?.id || supportImages[0]?.id,
+        module_card_hands: supportImages[7]?.id || supportImages[1]?.id,
+        module_card_arm: supportImages[8]?.id || supportImages[2]?.id,
+        diagram_overlay_image: supportImages[9]?.id || supportImages[0]?.id,
+        participant_a_feedback: captionAsset?.content || bodyAssets[0]?.content,
+        participant_b_feedback: bodyAssets[1]?.content,
+        participant_c_feedback: bodyAssets[2]?.content,
+        participant_d_feedback: bodyAssets[3]?.content
       }
     };
   };
