@@ -40,6 +40,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LayoutBlock, GridSettings } from './types';
+import { analyzeProjectContent } from './utils/analyzeProjectContent';
+import { loadTemplates } from './utils/loadTemplate';
+import { renderJSONToLayoutBlocks } from './utils/renderElements';
+import { ContentJSON, RenderJSON, TemplateJSON } from './utils/templateTypes';
 
 // Constants
 const COLUMNS = 12;
@@ -86,6 +90,8 @@ const CANVAS_PRESETS: Array<{
   { id: 'a3', label: 'A3', viewportLabel: 'A3_PRINT', width: 1123, height: 1587, defaultOrientation: 'portrait' },
   { id: 'a4', label: 'A4', viewportLabel: 'A4_PRINT', width: 794, height: 1123, defaultOrientation: 'portrait' },
 ];
+
+const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9'];
 
 const resolveCanvasSize = (
   preset: typeof CANVAS_PRESETS[number],
@@ -198,6 +204,9 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<{role:'user'|'ai', text:string}[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState<TemplateJSON[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>('auto');
+  const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
   
   // Drag State
   const [dragPreview, setDragPreview] = useState<{ id: string, x: number, y: number } | null>(null);
@@ -286,6 +295,14 @@ export default function App() {
     window.addEventListener('resize', fitCanvasToViewport);
     return () => window.removeEventListener('resize', fitCanvasToViewport);
   }, [fitCanvasToViewport]);
+
+  useEffect(() => {
+    loadTemplates(TEMPLATE_IDS)
+      .then(setAvailableTemplates)
+      .catch(error => {
+        setChatMessages(prev => [...prev, { role: 'ai', text: `模板加载失败: ${error.message}` }]);
+      });
+  }, []);
 
   const addBlock = (name: string, category: LayoutBlock['category'], type: LayoutBlock['type'] = 'container') => {
     rememberBlocks();
@@ -804,134 +821,107 @@ export default function App() {
     setNewTextAsset('');
   };
 
+  const buildContentJSON = (userMessage: string, detectedStage: string): ContentJSON => {
+    const titleAsset = textAssets.find(asset => asset.role === 'title');
+    const subtitleAsset = textAssets.find(asset => asset.role === 'subtitle');
+    const bodyAssets = textAssets.filter(asset => asset.role === 'body');
+    const captionAsset = textAssets.find(asset => asset.role === 'caption');
+    const labelAsset = textAssets.find(asset => asset.role === 'label');
+    const heroImage = imageAssets.find(asset => asset.role === 'hero') || imageAssets[0];
+    const supportImages = imageAssets.filter(asset => asset.id !== heroImage?.id);
+    const combinedText = [userMessage, ...textAssets.map(asset => asset.content)].join('\n');
+    const statistic = combinedText.match(/\b\d+(?:\.\d+)?%|\b\d+(?:,\d{3})*(?:\.\d+)?\b/)?.[0];
+
+    return {
+      projectId: 'local_project',
+      stage: detectedStage,
+      contentTypes: textAssets.map(asset => asset.role),
+      content: {
+        page_title: titleAsset?.content || subtitleAsset?.content || userMessage.split('\n')[0] || 'Portfolio Page',
+        background_summary: bodyAssets[0]?.content || userMessage,
+        section_heading: labelAsset?.content || 'Evidence Mapping',
+        evidence_caption: captionAsset?.content || bodyAssets[1]?.content || userMessage,
+        research_question: textAssets.find(asset => asset.content.toLowerCase().includes('how might we'))?.content || 'How might we frame the opportunity?',
+        context_text: subtitleAsset?.content || bodyAssets[0]?.content || userMessage,
+        function_text: bodyAssets[0]?.content || userMessage,
+        usage_text: bodyAssets[1]?.content || captionAsset?.content || userMessage,
+        image_caption: captionAsset?.content,
+        key_statistic: statistic,
+        context_visual: heroImage?.id,
+        hero_usage_image: heroImage?.id,
+        main_usage_image: heroImage?.id,
+        secondary_usage_image: supportImages[0]?.id,
+        component_image: supportImages[1]?.id || supportImages[0]?.id,
+        material_detail_image: supportImages[2]?.id || supportImages[1]?.id
+      }
+    };
+  };
+
+  const hydrateRenderJSONImages = (renderJSON: RenderJSON): RenderJSON => ({
+    ...renderJSON,
+    elements: renderJSON.elements.map(element => {
+      if (element.type !== 'image') return element;
+      const asset = imageAssets.find(item => item.id === element.src);
+      return asset ? { ...element, src: asset.dataUrl } : element;
+    })
+  });
+
   const callGeminiLayout = async (userMessage: string) => {
     setAiLoading(true);
     setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setChatInput('');
 
     try {
-      const imageManifest = imageAssets.map(asset => ({
-        id: asset.id,
-        name: asset.name,
-        role: asset.role,
-        size: asset.width && asset.height ? `${asset.width}x${asset.height}` : 'unknown'
-      }));
-      const textManifest = textAssets.map(asset => ({
-        id: asset.id,
-        role: asset.role,
-        content: asset.content
-      }));
+      if (!availableTemplates.length) {
+        throw new Error('模板还没有加载完成，请稍后再试。');
+      }
 
-      const systemPrompt = `你是一个专业的 Swiss Design 排版系统。
-你的任务是根据用户的描述、图片素材池和文本素材池，生成一个适合的网格排版布局。
-
-网格系统规格：
-- 当前画布：${canvasViewportLabel}，${canvasSize.width}px × ${canvasSize.height}px
-- 画布网格：12列 × 8行
-- 当前每列宽：${gridMetrics.colWidth.toFixed(2)}px，每行高：${gridMetrics.rowHeight.toFixed(2)}px，间距：12px
-- 坐标从 (0,0) 开始，x 最大 11，y 最大 7
-
-图片素材池：
-${JSON.stringify(imageManifest, null, 2)}
-
-文本素材池：
-${JSON.stringify(textManifest, null, 2)}
-
-你必须只输出一个合法的 JSON 对象，不要有任何其他文字、解释或 markdown 代码块。
-格式如下：
-{
-  "blocks": [
-    { "type": "title", "label": "标题文字", "assetId": "文本素材id，可选", "x": 0, "y": 0, "w": 8, "h": 1, "category": "Generic" },
-    { "type": "image", "label": "IMAGE", "assetId": "图片素材id，可选", "x": 0, "y": 1, "w": 6, "h": 5, "category": "Generic" },
-    {
-      "type": "text",
-      "label": "描述文字",
-      "assetId": "文本素材id，可选",
-      "x": 6,
-      "y": 1,
-      "w": 6,
-      "h": 3,
-      "category": "Generic",
-      "zIndex": 3,
-      "overflowMode": "visible",
-      "backgroundColor": "transparent",
-      "padding": 8
-    }
-  ],
-  "reasoning": "简短说明排版思路（中文）"
-}
-
-type 只能是: container | text | heading | image | title
-category 只能是: Generic | Define | Ideation | Prototype | Final
-overflowMode 只能是: clip | visible | autoHeight
-如果要使用素材池里的图片或文字，必须在 block 中写入对应的 assetId。
-图片 block 优先使用图片素材池；title/heading/text 优先使用文本素材池。
-当需要杂志式图文叠压时，可以让文字 block 与图片 block 重叠，并提高文字的 zIndex。
-确保所有 block 不超出边界：x + w <= 12，y + h <= 8
-`;
-
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [
-          { text: userMessage }
-        ],
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.4,
-          responseMimeType: 'application/json'
-        }
+      const analysis = analyzeProjectContent(userMessage);
+      const contentJSON = buildContentJSON(userMessage, analysis.detectedStage);
+      const response = await fetch('/api/generate-layout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          prompt: userMessage,
+          selectedTemplateId,
+          contentJSON,
+          textAssets: textAssets.map(asset => ({
+            id: asset.id,
+            role: asset.role,
+            content: asset.content
+          })),
+          imageAssets: imageAssets.map(asset => ({
+            id: asset.id,
+            name: asset.name,
+            role: asset.role,
+            width: asset.width,
+            height: asset.height
+          }))
+        })
       });
 
-      const rawText = response.text || '{}';
-      const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
-
-      if (parsed.blocks && Array.isArray(parsed.blocks)) {
-        const newBlocks: LayoutBlock[] = parsed.blocks.map((b: any, index: number) => {
-          const blockType = b.type || 'container';
-          const imageAsset = imageAssets.find(asset => asset.id === b.assetId);
-          const textAsset = textAssets.find(asset => asset.id === b.assetId);
-          const isGeneratedText = isTextBlock(blockType);
-          const resolvedLabel = textAsset?.content || b.label || (blockType === 'image' ? 'IMAGE' : 'BLOCK');
-
-          return {
-            id: createLocalId(),
-            type: blockType,
-            label: isGeneratedText ? resolvedLabel : resolvedLabel.toUpperCase(),
-            x: Math.max(0, Math.min(11, b.x || 0)),
-            y: Math.max(0, Math.min(7, b.y || 0)),
-            w: Math.max(1, Math.min(12, b.w || 2)),
-            h: Math.max(1, Math.min(8, b.h || 2)),
-            category: b.category || 'Generic',
-            assetId: b.assetId,
-            imageUrl: blockType === 'image' ? imageAsset?.dataUrl : undefined,
-            imageFit: 'cover',
-            imageZoom: 1,
-            imagePanX: 0,
-            imagePanY: 0,
-            fontSize: isGeneratedText ? (blockType === 'title' ? 28 : blockType === 'heading' ? 18 : 12) : undefined,
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: blockType === 'title' || blockType === 'heading' ? 'bold' : 'normal',
-            fontStyle: 'normal',
-            textColor: blockType === 'image' ? undefined : '#111111',
-            backgroundColor: b.backgroundColor || 'transparent',
-            overflowMode: b.overflowMode || (isGeneratedText ? 'visible' : 'clip'),
-            padding: typeof b.padding === 'number' ? b.padding : 8,
-            zIndex: typeof b.zIndex === 'number' ? b.zIndex : index + 1,
-            generatedByAI: true
-          };
-        });
-
-        rememberBlocks();
-        setBlocks(settleBlocks(newBlocks));
-        selectOnly(null);
-        setChatMessages(prev => [...prev, {
-          role: 'ai',
-          text: parsed.reasoning || '排版已生成，可在画布上查看并继续调整。'
-        }]);
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'API 生成失败。');
       }
+
+      const renderJSON = hydrateRenderJSONImages(result.renderJSON);
+      const newBlocks = renderJSONToLayoutBlocks(renderJSON);
+      const template = availableTemplates.find(item => item.templateMeta.templateId === result.selectedTemplate);
+
+      rememberBlocks();
+      setCanvasPresetId('digital-16-9');
+      setCanvasOrientation('landscape');
+      setLayoutMode('editorial');
+      setLastRenderJSON(renderJSON);
+      setBlocks(newBlocks);
+      selectOnly(null);
+      setChatMessages(prev => [...prev, {
+        role: 'ai',
+        text: `AI 已根据提示词调整 Render JSON。模板参考：${template?.templateMeta.templateName || result.selectedTemplate}。${result.reasoning || ''}`
+      }]);
     } catch (err: any) {
       setChatMessages(prev => [...prev, { role: 'ai', text: `生成失败: ${err.message}` }]);
     } finally {
@@ -1202,10 +1192,22 @@ overflowMode 只能是: clip | visible | autoHeight
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-swiss-black/60">
                 <Zap size={13} />
-                AI Insert
+                AI Template
               </div>
               {aiLoading && <span className="text-[8px] font-mono font-bold text-swiss-red animate-pulse">GENERATING</span>}
             </div>
+            <select
+              value={selectedTemplateId}
+              onChange={(event) => setSelectedTemplateId(event.target.value)}
+              className="mb-2 w-full h-8 bg-white border border-swiss-black/10 px-2 text-[10px] font-black uppercase outline-none focus:border-swiss-red"
+            >
+              <option value="auto">AI Select Template</option>
+              {availableTemplates.map(template => (
+                <option key={template.templateMeta.templateId} value={template.templateMeta.templateId}>
+                  {template.templateMeta.templateName}
+                </option>
+              ))}
+            </select>
             <textarea
               value={chatInput}
               onChange={(event) => setChatInput(event.target.value)}
@@ -1222,8 +1224,17 @@ overflowMode 只能是: clip | visible | autoHeight
               disabled={aiLoading || !chatInput.trim()}
               className="mt-2 w-full h-9 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
             >
-              Generate Layout
+              Generate with AI
             </button>
+            {lastRenderJSON && (
+              <div className="mt-2 border border-swiss-black/10 bg-white/60 p-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-swiss-black/35">Render JSON</span>
+                  <span className="font-mono text-[8px] text-swiss-red">{lastRenderJSON.elements.length} elements</span>
+                </div>
+                <p className="mt-1 text-[9px] font-mono text-swiss-black/45 break-all">{lastRenderJSON.templateId}</p>
+              </div>
+            )}
             <div className="mt-3 space-y-2">
               {chatMessages.slice(-3).map((msg, index) => (
                 <div
