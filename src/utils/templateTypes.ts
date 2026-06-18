@@ -34,6 +34,7 @@ export type TemplateJSON = {
     layoutDensity: string;
     alignment: string;
     type: string;
+    coordinateSystem?: '12x8_grid' | string;
   };
   elements?: Array<{
     slotId: string;

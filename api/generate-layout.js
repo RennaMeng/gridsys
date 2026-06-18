@@ -130,8 +130,8 @@ const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, 
   return {
     templateId: template.templateMeta.templateId,
     canvas: {
-      width: template.canvas.width,
-      height: template.canvas.height
+      width: template.grid.columns,
+      height: template.grid.rows
     },
     elements
   };
@@ -175,7 +175,7 @@ export default async function handler(req, res) {
 
     const systemInstruction = `You are an AI content-to-layout-slot mapper for a web-based design portfolio generator.
 
-The selected Template JSON owns all layout geometry. The frontend/server will read selectedTemplate.elements to get x, y, w, h, type, style, crop, and zIndex.
+The selected Template JSON owns all layout geometry. The frontend/server will read selectedTemplate.elements to get 12x8 grid x, y, w, h, type, style, crop, and zIndex.
 Your job is only to decide which supplied content or asset should fill each slot.
 
 Critical output rule:
