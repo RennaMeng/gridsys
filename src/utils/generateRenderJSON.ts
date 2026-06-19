@@ -52,8 +52,8 @@ export function generateRenderJSON(template: TemplateJSON, filledTemplate: Fille
   return {
     templateId: template.templateMeta.templateId,
     canvas: {
-      width: template.canvas.width,
-      height: template.canvas.height
+      width: template.grid.columns,
+      height: template.grid.rows
     },
     elements
   };

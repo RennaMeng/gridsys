@@ -17,16 +17,7 @@
     ]
   },
   "canvas": {
-    "ratio": "16:9",
-    "width": 1920,
-    "height": 1080,
-    "orientation": "landscape",
-    "safeMargin": {
-      "top": 60,
-      "right": 70,
-      "bottom": 60,
-      "left": 70
-    }
+    "ratio": "16:9"
   },
   "grid": {
     "type": "research_infographic_grid",

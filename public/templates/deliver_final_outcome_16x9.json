@@ -17,16 +17,7 @@
     ]
   },
   "canvas": {
-    "ratio": "16:9",
-    "width": 1920,
-    "height": 1080,
-    "orientation": "landscape",
-    "safeMargin": {
-      "top": 48,
-      "right": 48,
-      "bottom": 48,
-      "left": 48
-    }
+    "ratio": "16:9"
   },
   "grid": {
     "type": "deliver_outcome_showcase_grid",

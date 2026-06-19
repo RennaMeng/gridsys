@@ -16,15 +16,6 @@ export type TemplateJSON = {
   };
   canvas: {
     ratio: string;
-    width: number;
-    height: number;
-    orientation: string;
-    safeMargin: {
-      top: number;
-      right: number;
-      bottom: number;
-      left: number;
-    };
   };
   grid: {
     columns: number;
