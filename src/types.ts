@@ -31,6 +31,7 @@ export interface LayoutBlock {
   backgroundColor?: string;
   padding?: number;
   overflowMode?: 'clip' | 'visible' | 'autoHeight';
+  lineClamp?: number;
   zIndex?: number;
   linkUrl?: string;
   generatedByAI?: boolean;

@@ -20,6 +20,8 @@ export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] 
     const h = clamp(toGrid(element.h, renderJSON.canvas.height, 8), 1, 8 - y);
     const type = blockType(element);
     const isText = type === 'text' || type === 'heading' || type === 'title';
+    const textRules = element.textRules;
+    const fallbackFontSize = element.style === 'title' ? 28 : element.style === 'heading' ? 18 : element.type === 'chart' ? 26 : 12;
 
     return {
       id: `${element.id}-${index}`,
@@ -39,14 +41,15 @@ export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] 
       imageZoom: 1,
       imagePanX: 0,
       imagePanY: 0,
-      fontSize: element.style === 'title' ? 28 : element.style === 'heading' ? 18 : element.type === 'chart' ? 26 : 12,
+      fontSize: textRules?.fontSize || fallbackFontSize,
       fontFamily: 'Inter, sans-serif',
       fontWeight: element.style === 'title' || element.style === 'heading' || element.type === 'chart' ? 'bold' : 'normal',
       fontStyle: element.type === 'caption' ? 'italic' : 'normal',
       textColor: '#111111',
       backgroundColor: element.type === 'annotation' ? '#1040FF' : element.type === 'chart' ? '#FFF3C4' : 'transparent',
-      overflowMode: isText ? 'visible' : 'clip',
-      padding: isText ? 8 : undefined,
+      overflowMode: isText ? (textRules?.overflow || 'clip') : 'clip',
+      padding: isText ? (textRules?.padding ?? 8) : undefined,
+      lineClamp: isText ? textRules?.lineClamp : undefined,
       zIndex: element.zIndex || index + 1,
       generatedByAI: true
     };

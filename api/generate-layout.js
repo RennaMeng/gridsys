@@ -113,6 +113,16 @@ const fallbackAssetForSlot = (slotId, contentJSON, imageAssets) => {
   return fallbackMap[slotId] || imageAssets[0]?.id;
 };
 
+const fitTextToRule = (value, textRules) => {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  const maxChars = Number(textRules?.maxChars) || 0;
+  if (!maxChars || text.length <= maxChars) return text;
+
+  const clipped = text.slice(0, Math.max(0, maxChars - 1)).trim();
+  const lastSpace = clipped.lastIndexOf(' ');
+  return `${(lastSpace > maxChars * 0.65 ? clipped.slice(0, lastSpace) : clipped).trim()}…`;
+};
+
 const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, imageAssets) => {
   const assignmentMap = new Map(slotAssignments.map(assignment => [assignment.slotId, assignment]));
   const elements = (template.elements || [])
@@ -132,16 +142,17 @@ const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, 
         style: templateElement.style,
         crop: templateElement.crop,
         chartType: templateElement.chartType,
-        zIndex: templateElement.zIndex
+        zIndex: templateElement.zIndex,
+        textRules: templateElement.textRules
       };
 
       if (templateElement.type === 'image') {
         element.src = assignment?.assetId || fallbackAssetForSlot(templateElement.slotId, contentJSON, imageAssets);
       } else if (templateElement.type === 'chart') {
-        element.value = assignment?.value || assignment?.content || fallbackContentForSlot(templateElement.slotId, contentJSON);
-        element.label = assignment?.label || 'Key statistic';
+        element.value = fitTextToRule(assignment?.value || assignment?.content || fallbackContentForSlot(templateElement.slotId, contentJSON), templateElement.textRules);
+        element.label = fitTextToRule(assignment?.label || 'Key statistic', templateElement.textRules);
       } else if (templateElement.type !== 'divider') {
-        element.content = assignment?.content || fallbackContentForSlot(templateElement.slotId, contentJSON) || templateElement.role;
+        element.content = fitTextToRule(assignment?.content || fallbackContentForSlot(templateElement.slotId, contentJSON) || templateElement.role, templateElement.textRules);
       }
 
       return element;
@@ -224,6 +235,7 @@ Slot assignment rules:
 - slotId must exactly match one of selectedTemplate.elements[].slotId.
 - For image slots, use assetId from imageAssets. Do not invent external URLs.
 - For text, caption, and annotation slots, write concise content based only on userPrompt, textAssets, and contentJSON.
+- Follow each selectedTemplate.elements[].textRules exactly when present. Never exceed maxChars.
 - For chart slots, use value and label. If no data exists, mark visible false unless the slot is required.
 - Required slots must be included and visible.
 - Optional slots may be hidden with visible false when they do not help the narrative.

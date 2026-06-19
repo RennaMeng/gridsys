@@ -40,6 +40,7 @@ export type TemplateJSON = {
     chartType?: string;
     zIndex?: number;
     required?: boolean;
+    textRules?: TextRules;
   }>;
   contentRequirements: {
     required: string[];
@@ -55,6 +56,14 @@ export type TemplateJSON = {
   styleRules: Record<string, unknown>;
   aiGenerationRules: Record<string, unknown>;
   layoutVariants: Array<Record<string, unknown> & { variantId: string; layoutLogic: string }>;
+};
+
+export type TextRules = {
+  maxChars?: number;
+  fontSize?: number;
+  lineClamp?: number;
+  overflow?: 'clip' | 'visible' | 'autoHeight';
+  padding?: number;
 };
 
 export type ContentJSON = {
@@ -92,6 +101,7 @@ export type RenderElement = {
   value?: number | string;
   label?: string;
   zIndex?: number;
+  textRules?: TextRules;
 };
 
 export type RenderJSON = {

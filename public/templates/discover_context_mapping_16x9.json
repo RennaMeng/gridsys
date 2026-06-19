@@ -40,7 +40,14 @@
       "h": 1,
       "style": "title",
       "zIndex": 4,
-      "required": true
+      "required": true,
+      "textRules": {
+        "maxChars": 48,
+        "fontSize": 22,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
     },
     {
       "slotId": "context_visual",
@@ -65,7 +72,14 @@
       "h": 2,
       "style": "body",
       "zIndex": 4,
-      "required": true
+      "required": true,
+      "textRules": {
+        "maxChars": 150,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
     },
     {
       "slotId": "key_statistic",
@@ -78,7 +92,14 @@
       "style": "chart",
       "chartType": "percentage",
       "zIndex": 3,
-      "required": false
+      "required": false,
+      "textRules": {
+        "maxChars": 28,
+        "fontSize": 20,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 8
+      }
     },
     {
       "slotId": "research_divider",
@@ -102,7 +123,14 @@
       "h": 1,
       "style": "heading",
       "zIndex": 4,
-      "required": false
+      "required": false,
+      "textRules": {
+        "maxChars": 32,
+        "fontSize": 16,
+        "lineClamp": 1,
+        "overflow": "clip",
+        "padding": 6
+      }
     },
     {
       "slotId": "evidence_caption",
@@ -114,7 +142,14 @@
       "h": 2,
       "style": "caption",
       "zIndex": 4,
-      "required": false
+      "required": false,
+      "textRules": {
+        "maxChars": 110,
+        "fontSize": 10,
+        "lineClamp": 5,
+        "overflow": "clip",
+        "padding": 6
+      }
     },
     {
       "slotId": "research_question",
@@ -126,7 +161,14 @@
       "h": 2,
       "style": "title",
       "zIndex": 5,
-      "required": true
+      "required": true,
+      "textRules": {
+        "maxChars": 80,
+        "fontSize": 18,
+        "lineClamp": 3,
+        "overflow": "clip",
+        "padding": 8
+      }
     },
     {
       "slotId": "mapping_annotation",
@@ -138,7 +180,14 @@
       "h": 1,
       "style": "annotation",
       "zIndex": 5,
-      "required": false
+      "required": false,
+      "textRules": {
+        "maxChars": 32,
+        "fontSize": 10,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
     }
   ],
   "contentRequirements": {

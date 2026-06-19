@@ -40,7 +40,14 @@
       "h": 1,
       "style": "title",
       "zIndex": 4,
-      "required": true
+      "required": true,
+      "textRules": {
+        "maxChars": 30,
+        "fontSize": 22,
+        "lineClamp": 1,
+        "overflow": "clip",
+        "padding": 6
+      }
     },
     {
       "slotId": "participant_a_feedback",
@@ -52,7 +59,14 @@
       "h": 1,
       "style": "caption",
       "zIndex": 4,
-      "required": false
+      "required": false,
+      "textRules": {
+        "maxChars": 95,
+        "fontSize": 9,
+        "lineClamp": 4,
+        "overflow": "clip",
+        "padding": 6
+      }
     },
     {
       "slotId": "participant_b_feedback",
@@ -64,7 +78,14 @@
       "h": 1,
       "style": "caption",
       "zIndex": 4,
-      "required": false
+      "required": false,
+      "textRules": {
+        "maxChars": 80,
+        "fontSize": 9,
+        "lineClamp": 4,
+        "overflow": "clip",
+        "padding": 6
+      }
     },
     {
       "slotId": "testing_image_a",
@@ -102,7 +123,14 @@
       "h": 1,
       "style": "caption",
       "zIndex": 4,
-      "required": false
+      "required": false,
+      "textRules": {
+        "maxChars": 95,
+        "fontSize": 9,
+        "lineClamp": 4,
+        "overflow": "clip",
+        "padding": 6
+      }
     },
     {
       "slotId": "participant_d_feedback",
@@ -114,7 +142,14 @@
       "h": 1,
       "style": "caption",
       "zIndex": 4,
-      "required": false
+      "required": false,
+      "textRules": {
+        "maxChars": 80,
+        "fontSize": 9,
+        "lineClamp": 4,
+        "overflow": "clip",
+        "padding": 6
+      }
     },
     {
       "slotId": "component_spread_image",

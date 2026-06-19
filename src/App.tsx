@@ -764,7 +764,8 @@ export default function App() {
         }
 
         const lineHeight = fontSize * 1.4;
-        const totalTextHeight = lines.length * lineHeight;
+        const visibleLines = block.lineClamp ? lines.slice(0, block.lineClamp) : lines;
+        const totalTextHeight = visibleLines.length * lineHeight;
         
         // 垂直起始位置：title 居中，其他贴顶
         const startY = block.type === 'title'
@@ -785,7 +786,7 @@ export default function App() {
           textEl.setAttribute('clip-path', `url(#${textClipId})`);
         }
 
-        lines.forEach((line, i) => {
+        visibleLines.forEach((line, i) => {
           const tspan = document.createElementNS(svgNS, 'tspan');
           tspan.setAttribute('x', String(textX));
           tspan.setAttribute('dy', i === 0 ? '0' : String(lineHeight));
@@ -1925,6 +1926,14 @@ export default function App() {
                     onChange={(v) => updateBlock(selectedBlock.id, { padding: v })}
                   />
 
+                  <PrecisionSlider
+                    label="Line Clamp"
+                    min={0}
+                    max={8}
+                    value={selectedBlock.lineClamp ?? 0}
+                    onChange={(v) => updateBlock(selectedBlock.id, { lineClamp: v === 0 ? undefined : v })}
+                  />
+
                   {/* 字体选择 */}
                   <div>
                     <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">TYPEFACE</span>
@@ -2282,6 +2291,7 @@ function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBl
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [hasOverflow, setHasOverflow] = useState(false);
   const overflowMode = block.overflowMode || 'visible';
+  const lineClamp = block.lineClamp;
   const textStyle: React.CSSProperties = {
     fontFamily: block.fontFamily || 'monospace',
     fontWeight: block.fontWeight === 'black' ? 900 : block.fontWeight === 'bold' ? 700 : 400,
@@ -2301,9 +2311,17 @@ function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBl
     return (
       <div
         className={`w-full relative leading-snug whitespace-pre-wrap break-words ${
-          overflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
+          overflowMode === 'visible' && !lineClamp ? 'overflow-visible' : 'overflow-hidden'
         } ${overflowMode === 'autoHeight' ? 'min-h-full h-auto' : 'h-full'}`}
-        style={{ ...textStyle, padding: block.padding ?? 8 }}
+        style={{
+          ...textStyle,
+          padding: block.padding ?? 8,
+          ...(lineClamp ? {
+            display: '-webkit-box',
+            WebkitLineClamp: lineClamp,
+            WebkitBoxOrient: 'vertical'
+          } : {})
+        }}
       >
         {block.label}
       </div>
