@@ -54,6 +54,8 @@ const GUTTER = 12;
 type CanvasPresetId = 'digital-16-9' | 'strip-1800-768' | 'a3' | 'a4';
 type CanvasOrientation = 'landscape' | 'portrait';
 type LayoutMode = 'strict' | 'editorial';
+type SidebarMode = 'generate' | 'edit';
+type PageStage = 'discover' | 'define' | 'develop' | 'deliver';
 type ImageAssetRole = 'hero' | 'support' | 'texture' | 'reference';
 type TextAssetRole = 'title' | 'subtitle' | 'body' | 'caption' | 'label';
 
@@ -92,6 +94,12 @@ const CANVAS_PRESETS: Array<{
 ];
 
 const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9', 'deliver_final_outcome_16x9'];
+const STAGE_TEMPLATE_MAP: Record<PageStage, string> = {
+  discover: 'discover_context_mapping_16x9',
+  define: 'auto',
+  develop: 'develop_prototype_demo_16x9',
+  deliver: 'deliver_final_outcome_16x9'
+};
 
 const resolveCanvasSize = (
   preset: typeof CANVAS_PRESETS[number],
@@ -180,7 +188,7 @@ export default function App() {
   const [showGrid, setShowGrid] = useState(true);
   const [zoom, setZoom] = useState(0.85);
   const [isLocked, setIsLocked] = useState(false);
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('strict');
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('editorial');
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem('gridSysGuideSeen') !== '1');
   const [canvasPresetId, setCanvasPresetId] = useState<CanvasPresetId>('digital-16-9');
   const [canvasOrientation, setCanvasOrientation] = useState<CanvasOrientation>('landscape');
@@ -207,6 +215,16 @@ export default function App() {
   const [availableTemplates, setAvailableTemplates] = useState<TemplateJSON[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>('auto');
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
+  const [pageStage, setPageStage] = useState<PageStage>('discover');
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    pageType: false,
+    assets: false,
+    ai: false,
+    reference: true,
+    basicBlocks: false,
+    editLayout: false
+  });
   
   // Drag State
   const [dragPreview, setDragPreview] = useState<{ id: string, x: number, y: number } | null>(null);
@@ -285,6 +303,15 @@ export default function App() {
   const selectCanvasPreset = (preset: typeof CANVAS_PRESETS[number]) => {
     setCanvasPresetId(preset.id);
     setCanvasOrientation(preset.defaultOrientation);
+  };
+
+  const selectPageStage = (stage: PageStage) => {
+    setPageStage(stage);
+    setSelectedTemplateId(STAGE_TEMPLATE_MAP[stage]);
+  };
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
   useEffect(() => {
@@ -780,7 +807,7 @@ export default function App() {
     setZoom(prev => Math.min(Math.max(prev + delta, 0.4), 1.5));
   };
 
-  const handleImageAssetUpload = (files: FileList | File[]) => {
+  const handleImageAssetUpload = (files: FileList | File[], forcedRole?: ImageAssetRole) => {
     const nextFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
     nextFiles.slice(0, Math.max(0, 10 - imageAssets.length)).forEach(file => {
       const reader = new FileReader();
@@ -794,7 +821,7 @@ export default function App() {
               id: createLocalId(),
               name: file.name.replace(/\.[^.]+$/, ''),
               dataUrl,
-              role: prev.length === 0 ? 'hero' : 'support',
+              role: forcedRole || (prev.length === 0 ? 'hero' : 'support'),
               width: image.naturalWidth,
               height: image.naturalHeight
             }
@@ -1030,28 +1057,6 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-8 text-[11px] font-bold uppercase tracking-wider text-white/50">
-          <div className="flex items-center gap-2">
-            <span>Layout</span>
-            <div className="flex border border-white/15 bg-white/5">
-              {[
-                { value: 'strict' as const, label: 'STRICT' },
-                { value: 'editorial' as const, label: 'FREE' },
-              ].map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => setLayoutMode(option.value)}
-                  className={`px-2.5 py-1 text-[10px] font-black font-mono transition-colors ${
-                    layoutMode === option.value
-                      ? 'bg-swiss-red text-white'
-                      : 'text-white/55 hover:text-white hover:bg-white/10'
-                  }`}
-                  title={option.value === 'strict' ? 'Strict Grid: 自动避让' : 'Editorial Freeform: 允许叠放'}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
           <div className="flex items-center gap-3">
             <span>Grid Visibility</span>
             <div 
@@ -1079,205 +1084,316 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Sidebar Left: Library */}
+      {/* Sidebar Left: Guided Workflow */}
       <aside className="fixed left-0 top-[52px] bottom-0 w-[300px] glass-panel z-40 flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-swiss-black/5 bg-white/50">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[11px] font-extrabold uppercase tracking-widest text-swiss-black/40">Components</h2>
+        <div className="p-4 border-b border-swiss-black/5 bg-white/60">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[11px] font-extrabold uppercase tracking-widest text-swiss-black/45">Workflow</h2>
             <Search size={14} className="opacity-30" />
           </div>
-          <div className="flex gap-2">
-            <div className="h-6 px-2 bg-swiss-black text-white text-[10px] flex items-center font-bold uppercase tracking-tighter">HCI.V1</div>
-            <div className="h-6 px-2 border border-swiss-black text-[10px] flex items-center font-bold uppercase tracking-tighter">LAYOUT</div>
+          <div className="grid grid-cols-2 gap-1">
+            {[
+              { value: 'generate' as const, label: 'AI Generate' },
+              { value: 'edit' as const, label: 'Free Edit' },
+            ].map(mode => (
+              <button
+                key={mode.value}
+                onClick={() => setSidebarMode(mode.value)}
+                className={`h-8 text-[10px] font-black uppercase tracking-widest border transition-colors ${
+                  sidebarMode === mode.value
+                    ? 'bg-swiss-black text-white border-swiss-black'
+                    : 'bg-white/70 text-swiss-black/45 border-swiss-black/10 hover:border-swiss-red hover:text-swiss-red'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 scrollbar-hide space-y-6">
-          <CategorySection 
-            title="Basic Blocks" 
-            icon={<Box size={14} />} 
-            items={['Text Block', 'Image Block', 'Blank Block']} 
-            onAdd={(item) => addBlock(item, 'Generic', item === 'Image Block' ? 'image' : item === 'Text Block' ? 'text' : 'blank')}
-          />
-
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-swiss-black/60">
-                <ImageIcon size={13} />
-                Image Assets
-              </div>
-              <span className="font-mono text-[9px] text-swiss-black/35">{imageAssets.length}/10</span>
-            </div>
-            <button
-              onClick={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.multiple = true;
-                input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || []);
-                input.click();
-              }}
-              className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
-            >
-              <Upload size={13} />
-              Upload Images
-            </button>
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              {imageAssets.map(asset => (
-                <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
-                  <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
-                  <button
-                    onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
-                    className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    title="Remove image"
-                  >
-                    <X size={12} />
-                  </button>
-                  <select
-                    value={asset.role}
-                    onChange={(event) => setImageAssets(prev => prev.map(item => (
-                      item.id === asset.id ? { ...item, role: event.target.value as ImageAssetRole } : item
-                    )))}
-                    className="absolute left-1 bottom-1 max-w-[calc(100%-8px)] bg-white/90 border border-swiss-black/15 text-[8px] font-black uppercase outline-none"
-                    title="Image role"
-                  >
-                    <option value="hero">hero</option>
-                    <option value="support">support</option>
-                    <option value="texture">texture</option>
-                    <option value="reference">ref</option>
-                  </select>
+        <div className="flex-1 overflow-y-auto p-4 scrollbar-hide space-y-4">
+          {sidebarMode === 'generate' ? (
+            <>
+              <CollapsibleSection
+                title="1. Page Type"
+                icon={<LayoutGrid size={13} />}
+                collapsed={collapsedSections.pageType}
+                onToggle={() => toggleSection('pageType')}
+                meta={pageStage.toUpperCase()}
+              >
+                <div className="grid grid-cols-2 gap-1">
+                  {(['discover', 'define', 'develop', 'deliver'] as PageStage[]).map(stage => {
+                    const templateId = STAGE_TEMPLATE_MAP[stage];
+                    const template = availableTemplates.find(item => item.templateMeta.templateId === templateId);
+                    return (
+                      <button
+                        key={stage}
+                        onClick={() => selectPageStage(stage)}
+                        className={`min-h-12 border p-2 text-left transition-colors ${
+                          pageStage === stage
+                            ? 'bg-swiss-red text-white border-swiss-red'
+                            : 'bg-white/60 text-swiss-black border-swiss-black/10 hover:border-swiss-red'
+                        }`}
+                      >
+                        <span className="block text-[10px] font-black uppercase tracking-widest">{stage}</span>
+                        <span className={`block mt-1 text-[8px] leading-tight ${
+                          pageStage === stage ? 'text-white/75' : 'text-swiss-black/35'
+                        }`}>
+                          {template ? template.templateMeta.templateName : stage === 'define' ? 'Auto match' : 'Loading'}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-          </div>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(event) => setSelectedTemplateId(event.target.value)}
+                  className="mt-2 w-full h-8 bg-white border border-swiss-black/10 px-2 text-[10px] font-black uppercase outline-none focus:border-swiss-red"
+                >
+                  <option value="auto">AI Select Template</option>
+                  {availableTemplates.map(template => (
+                    <option key={template.templateMeta.templateId} value={template.templateMeta.templateId}>
+                      {template.templateMeta.templateName}
+                    </option>
+                  ))}
+                </select>
+              </CollapsibleSection>
 
-          <div>
-            <div className="flex items-center gap-2 mb-3 text-[10px] font-black uppercase tracking-widest text-swiss-black/60">
-              <Type size={13} />
-              Text Assets
-            </div>
-            <div className="grid grid-cols-5 gap-1 mb-2">
-              {(['title', 'subtitle', 'body', 'caption', 'label'] as TextAssetRole[]).map(role => (
+              <CollapsibleSection
+                title="2. Assets"
+                icon={<ImageIcon size={13} />}
+                collapsed={collapsedSections.assets}
+                onToggle={() => toggleSection('assets')}
+                meta={`${imageAssets.filter(asset => asset.role !== 'reference').length} IMG / ${textAssets.length} TXT`}
+              >
                 <button
-                  key={role}
-                  onClick={() => setNewTextRole(role)}
-                  className={`h-7 text-[8px] font-black uppercase border transition-colors ${
-                    newTextRole === role
-                      ? 'bg-swiss-black text-white border-swiss-black'
-                      : 'bg-white/50 border-swiss-black/10 text-swiss-black/45 hover:text-swiss-red hover:border-swiss-red'
-                  }`}
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.multiple = true;
+                    input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || []);
+                    input.click();
+                  }}
+                  className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
                 >
-                  {role}
+                  <Upload size={13} />
+                  Upload Images
                 </button>
-              ))}
-            </div>
-            <textarea
-              value={newTextAsset}
-              onChange={(event) => setNewTextAsset(event.target.value)}
-              placeholder="粘贴标题、正文、说明文字..."
-              className="w-full h-20 resize-none bg-white/70 border border-swiss-black/10 p-2 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-swiss-black/25"
-            />
-            <button
-              onClick={addTextAsset}
-              disabled={!newTextAsset.trim()}
-              className="mt-2 w-full h-8 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
-            >
-              Add Text
-            </button>
-            <div className="mt-3 space-y-2">
-              {textAssets.map(asset => (
-                <div key={asset.id} className="group border border-swiss-black/10 bg-white/60 p-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[8px] font-black uppercase tracking-widest text-swiss-red">{asset.role}</span>
-                    <button
-                      onClick={() => setTextAssets(prev => prev.filter(item => item.id !== asset.id))}
-                      className="text-swiss-black/25 hover:text-swiss-red"
-                      title="Remove text"
-                    >
-                      <X size={12} />
-                    </button>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {imageAssets.filter(asset => asset.role !== 'reference').map(asset => (
+                    <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
+                      <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
+                      <button
+                        onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                        className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                        title="Remove image"
+                      >
+                        <X size={12} />
+                      </button>
+                      <select
+                        value={asset.role}
+                        onChange={(event) => setImageAssets(prev => prev.map(item => (
+                          item.id === asset.id ? { ...item, role: event.target.value as ImageAssetRole } : item
+                        )))}
+                        className="absolute left-1 bottom-1 max-w-[calc(100%-8px)] bg-white/90 border border-swiss-black/15 text-[8px] font-black uppercase outline-none"
+                        title="Image role"
+                      >
+                        <option value="hero">hero</option>
+                        <option value="support">support</option>
+                        <option value="texture">texture</option>
+                        <option value="reference">ref</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4">
+                  <div className="grid grid-cols-5 gap-1 mb-2">
+                    {(['title', 'subtitle', 'body', 'caption', 'label'] as TextAssetRole[]).map(role => (
+                      <button
+                        key={role}
+                        onClick={() => setNewTextRole(role)}
+                        className={`h-7 text-[8px] font-black uppercase border transition-colors ${
+                          newTextRole === role
+                            ? 'bg-swiss-black text-white border-swiss-black'
+                            : 'bg-white/50 border-swiss-black/10 text-swiss-black/45 hover:text-swiss-red hover:border-swiss-red'
+                        }`}
+                      >
+                        {role}
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-[10px] leading-snug text-swiss-black/70 line-clamp-3 whitespace-pre-wrap">{asset.content}</p>
+                  <textarea
+                    value={newTextAsset}
+                    onChange={(event) => setNewTextAsset(event.target.value)}
+                    placeholder="粘贴标题、正文、说明文字..."
+                    className="w-full h-20 resize-none bg-white/70 border border-swiss-black/10 p-2 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-swiss-black/25"
+                  />
+                  <button
+                    onClick={addTextAsset}
+                    disabled={!newTextAsset.trim()}
+                    className="mt-2 w-full h-8 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
+                  >
+                    Add Text
+                  </button>
+                  <div className="mt-3 space-y-2">
+                    {textAssets.map(asset => (
+                      <div key={asset.id} className="group border border-swiss-black/10 bg-white/60 p-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-swiss-red">{asset.role}</span>
+                          <button
+                            onClick={() => setTextAssets(prev => prev.filter(item => item.id !== asset.id))}
+                            className="text-swiss-black/25 hover:text-swiss-red"
+                            title="Remove text"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <p className="text-[10px] leading-snug text-swiss-black/70 line-clamp-3 whitespace-pre-wrap">{asset.content}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              </CollapsibleSection>
 
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-swiss-black/60">
-                <Zap size={13} />
-                AI Template
-              </div>
-              {aiLoading && <span className="text-[8px] font-mono font-bold text-swiss-red animate-pulse">GENERATING</span>}
-            </div>
-            <select
-              value={selectedTemplateId}
-              onChange={(event) => setSelectedTemplateId(event.target.value)}
-              className="mb-2 w-full h-8 bg-white border border-swiss-black/10 px-2 text-[10px] font-black uppercase outline-none focus:border-swiss-red"
-            >
-              <option value="auto">AI Select Template</option>
-              {availableTemplates.map(template => (
-                <option key={template.templateMeta.templateId} value={template.templateMeta.templateId}>
-                  {template.templateMeta.templateName}
-                </option>
-              ))}
-            </select>
-            <textarea
-              value={chatInput}
-              onChange={(event) => setChatInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && chatInput.trim() && !aiLoading) {
-                  callGeminiLayout(chatInput.trim());
-                }
-              }}
-              placeholder="描述想要的排版，例如：主图占左侧，标题压在图片右上，正文放下方..."
-              className="w-full h-24 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
-            />
-            <button
-              onClick={() => chatInput.trim() && !aiLoading && callGeminiLayout(chatInput.trim())}
-              disabled={aiLoading || !chatInput.trim()}
-              className="mt-2 w-full h-9 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
-            >
-              Generate with AI
-            </button>
-            {lastRenderJSON && (
-              <div className="mt-2 border border-swiss-black/10 bg-white/60 p-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[8px] font-black uppercase tracking-widest text-swiss-black/35">Render JSON</span>
-                  <span className="font-mono text-[8px] text-swiss-red">{lastRenderJSON.elements.length} elements</span>
-                </div>
-                <p className="mt-1 text-[9px] font-mono text-swiss-black/45 break-all">{lastRenderJSON.templateId}</p>
-              </div>
-            )}
-            <div className="mt-3 space-y-2">
-              {chatMessages.slice(-3).map((msg, index) => (
-                <div
-                  key={`${msg.role}-${index}-${msg.text.slice(0, 12)}`}
-                  className={`p-2 text-[10px] leading-snug border ${
-                    msg.role === 'user'
-                      ? 'bg-white/60 border-swiss-black/10 text-swiss-black/55'
-                      : 'bg-swiss-red/10 border-swiss-red/20 text-swiss-black/75'
-                  }`}
+              <CollapsibleSection
+                title="3. AI Prompt"
+                icon={<Zap size={13} />}
+                collapsed={collapsedSections.ai}
+                onToggle={() => toggleSection('ai')}
+                meta={aiLoading ? 'GENERATING' : 'READY'}
+              >
+                <textarea
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && chatInput.trim() && !aiLoading) {
+                      callGeminiLayout(chatInput.trim());
+                    }
+                  }}
+                  placeholder="描述页面目标，例如：为 final outcome 页面生成一个右侧大图、左侧用户反馈和底部组件展示的排版..."
+                  className="w-full h-24 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
+                />
+                <button
+                  onClick={() => chatInput.trim() && !aiLoading && callGeminiLayout(chatInput.trim())}
+                  disabled={aiLoading || !chatInput.trim()}
+                  className="mt-2 w-full h-9 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
                 >
-                  <span className="block mb-1 text-[8px] font-black uppercase tracking-widest text-swiss-black/35">
-                    {msg.role === 'user' ? 'Prompt' : 'AI'}
-                  </span>
-                  {msg.text}
+                  Generate with AI
+                </button>
+                {lastRenderJSON && (
+                  <div className="mt-2 border border-swiss-black/10 bg-white/60 p-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[8px] font-black uppercase tracking-widest text-swiss-black/35">Render JSON</span>
+                      <span className="font-mono text-[8px] text-swiss-red">{lastRenderJSON.elements.length} elements</span>
+                    </div>
+                    <p className="mt-1 text-[9px] font-mono text-swiss-black/45 break-all">{lastRenderJSON.templateId}</p>
+                  </div>
+                )}
+                <div className="mt-3 space-y-2">
+                  {chatMessages.slice(-3).map((msg, index) => (
+                    <div
+                      key={`${msg.role}-${index}-${msg.text.slice(0, 12)}`}
+                      className={`p-2 text-[10px] leading-snug border ${
+                        msg.role === 'user'
+                          ? 'bg-white/60 border-swiss-black/10 text-swiss-black/55'
+                          : 'bg-swiss-red/10 border-swiss-red/20 text-swiss-black/75'
+                      }`}
+                    >
+                      <span className="block mb-1 text-[8px] font-black uppercase tracking-widest text-swiss-black/35">
+                        {msg.role === 'user' ? 'Prompt' : 'AI'}
+                      </span>
+                      {msg.text}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
+              </CollapsibleSection>
 
-        <div className="p-4 border-t border-swiss-black/5 bg-swiss-grey-light/30">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-swiss-red flex items-center justify-center text-white font-black text-xs">A</div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase leading-none">System User</span>
-              <span className="text-[9px] font-mono opacity-50 uppercase">Grid Author</span>
-            </div>
-          </div>
+              <CollapsibleSection
+                title="4. Reference"
+                icon={<Target size={13} />}
+                collapsed={collapsedSections.reference}
+                onToggle={() => toggleSection('reference')}
+                meta={`${imageAssets.filter(asset => asset.role === 'reference').length} REF`}
+              >
+                <button
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.multiple = true;
+                    input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || [], 'reference');
+                    input.click();
+                  }}
+                  className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
+                >
+                  <Upload size={13} />
+                  Add Reference Images
+                </button>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {imageAssets.filter(asset => asset.role === 'reference').map(asset => (
+                    <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
+                      <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
+                      <button
+                        onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                        className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                        title="Remove reference"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleSection>
+            </>
+          ) : (
+            <>
+              <CollapsibleSection
+                title="Basic Blocks"
+                icon={<Box size={13} />}
+                collapsed={collapsedSections.basicBlocks}
+                onToggle={() => toggleSection('basicBlocks')}
+              >
+                <CategorySection
+                  title="Basic Blocks"
+                  icon={<Box size={14} />}
+                  items={['Text Block', 'Image Block', 'Blank Block']}
+                  onAdd={(item) => addBlock(item, 'Generic', item === 'Image Block' ? 'image' : item === 'Text Block' ? 'text' : 'blank')}
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Layout Mode"
+                icon={<Layers size={13} />}
+                collapsed={collapsedSections.editLayout}
+                onToggle={() => toggleSection('editLayout')}
+                meta={layoutMode === 'editorial' ? 'FREE' : 'STRICT'}
+              >
+                <div className="grid grid-cols-2 gap-1">
+                  {[
+                    { value: 'editorial' as const, label: 'FREE', desc: '允许叠放，推荐' },
+                    { value: 'strict' as const, label: 'STRICT', desc: '自动避让' },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setLayoutMode(option.value)}
+                      className={`min-h-12 border p-2 text-left transition-colors ${
+                        layoutMode === option.value
+                          ? 'bg-swiss-red text-white border-swiss-red'
+                          : 'bg-white/60 text-swiss-black border-swiss-black/10 hover:border-swiss-red'
+                      }`}
+                    >
+                      <span className="block text-[10px] font-black uppercase tracking-widest">{option.label}</span>
+                      <span className={`block mt-1 text-[8px] ${layoutMode === option.value ? 'text-white/75' : 'text-swiss-black/35'}`}>
+                        {option.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </CollapsibleSection>
+            </>
+          )}
         </div>
       </aside>
 
@@ -2120,7 +2236,7 @@ export default function App() {
               <div className="flex items-start justify-between gap-6">
                 <div>
                   <h2 className="text-[13px] font-black uppercase tracking-widest">新手导航</h2>
-                  <p className="mt-2 text-[12px] leading-relaxed text-swiss-black/55">从左侧添加文字、图片或空白块；在画布上拖动排版；右侧编辑尺寸、文字样式和链接。</p>
+                  <p className="mt-2 text-[12px] leading-relaxed text-swiss-black/55">从左侧选择页面类型、上传素材并输入提示词；中间查看 AI 生成页面；右侧对每个元素进行精细调整。</p>
                 </div>
                 <button
                   onClick={() => {
@@ -2134,9 +2250,9 @@ export default function App() {
               </div>
               <div className="grid grid-cols-3 gap-3 mt-5">
                 {[
-                  { icon: <Plus size={18} />, title: '添加', body: '左侧只保留文字、图片、空白三类基础块。' },
-                  { icon: <MousePointer2 size={18} />, title: '多选', body: 'Shift 或 Command 点击多个块，再拖动整体移动。' },
-                  { icon: <Undo2 size={18} />, title: '撤回', body: '顶部 Undo 或 Command/Ctrl + Z 回退上一步。' },
+                  { icon: <Upload size={18} />, title: '素材', body: '在左侧 AI Generate 中选择页面类型，再上传图片、文字和参考图。' },
+                  { icon: <Zap size={18} />, title: '生成', body: '输入页面目标，AI 会选择对应模板并生成中间画布内容。' },
+                  { icon: <Settings2 size={18} />, title: '精修', body: '选中画布元素后，用右侧面板调整尺寸、图像和文字细节。' },
                 ].map(item => (
                   <div key={item.title} className="border border-swiss-black/10 p-4 bg-swiss-grey-base/40">
                     <div className="w-8 h-8 bg-swiss-black text-white flex items-center justify-center mb-3">{item.icon}</div>
@@ -2279,6 +2395,48 @@ function GridView({
       <div className="absolute top-0 right-0 w-8 h-8 border-t border-r border-swiss-red/30" />
       <div className="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-swiss-red/30" />
       <div className="absolute bottom-0 right-0 w-8 h-8 border-b border-r border-swiss-red/30" />
+    </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  icon,
+  collapsed,
+  onToggle,
+  children,
+  meta
+}: {
+  title: string;
+  icon: React.ReactNode;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  meta?: string;
+}) {
+  return (
+    <div className="border border-swiss-black/10 bg-white/50">
+      <button
+        onClick={onToggle}
+        className="w-full h-10 px-3 flex items-center justify-between text-left hover:bg-white/70 transition-colors"
+      >
+        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-swiss-black/60">
+          {icon}
+          {title}
+        </span>
+        <span className="flex items-center gap-2">
+          {meta && <span className="font-mono text-[8px] font-bold text-swiss-red">{meta}</span>}
+          <ChevronRight
+            size={13}
+            className={`text-swiss-black/35 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+          />
+        </span>
+      </button>
+      {!collapsed && (
+        <div className="px-3 pb-3">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
