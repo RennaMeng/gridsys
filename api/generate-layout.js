@@ -93,6 +93,18 @@ const fallbackAssetForSlot = (slotId, contentJSON, imageAssets) => {
   const content = contentJSON?.content || {};
   const fallbackMap = {
     context_visual: content.context_visual,
+    category_collage_image: content.category_collage_image || imageAssets[0]?.id,
+    category_summary_image: content.category_summary_image || imageAssets[1]?.id || imageAssets[0]?.id,
+    context_visual_a: content.context_visual_a || imageAssets[2]?.id || content.context_visual || imageAssets[0]?.id,
+    context_visual_b: content.context_visual_b || imageAssets[3]?.id || imageAssets[1]?.id || content.context_visual,
+    statistic_image_a: content.statistic_image_a || imageAssets[4]?.id || imageAssets[0]?.id,
+    statistic_image_b: content.statistic_image_b || imageAssets[5]?.id || imageAssets[1]?.id,
+    statistic_image_c: content.statistic_image_c || imageAssets[6]?.id || imageAssets[2]?.id,
+    statistic_image_d: content.statistic_image_d || imageAssets[7]?.id || imageAssets[3]?.id,
+    case_image_a: content.case_image_a || imageAssets[8]?.id || imageAssets[2]?.id,
+    case_image_b: content.case_image_b || imageAssets[9]?.id || imageAssets[3]?.id,
+    case_image_c: content.case_image_c || imageAssets[10]?.id || imageAssets[4]?.id,
+    case_image_d: content.case_image_d || imageAssets[11]?.id || imageAssets[5]?.id,
     hero_usage_image: content.hero_usage_image || content.main_usage_image,
     secondary_usage_image: content.secondary_usage_image,
     component_image: content.component_image,
@@ -240,6 +252,7 @@ Slot assignment rules:
 - Required slots must be included and visible.
 - Optional slots may be hidden with visible false when they do not help the narrative.
 - Discover pages explain why the problem or opportunity exists.
+- For Discover templates, charts, statistics, diagrams, and collage references are represented as image slots when matching image slots exist. Prefer filling image-heavy slots with uploaded imageAssets before hiding them.
 - Develop pages explain how the prototype works.
 - Deliver pages present the final outcome, validation feedback, usage scenarios, and component system.
 - Preserve narrative hierarchy from the template.

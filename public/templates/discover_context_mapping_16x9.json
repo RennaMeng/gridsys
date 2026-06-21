@@ -50,106 +50,146 @@
       }
     },
     {
-      "slotId": "context_visual",
+      "slotId": "background_summary",
+      "type": "text",
+      "role": "background_summary",
+      "x": 0,
+      "y": 1,
+      "w": 4,
+      "h": 1,
+      "style": "body",
+      "zIndex": 4,
+      "required": true,
+      "textRules": {
+        "maxChars": 120,
+        "fontSize": 10,
+        "lineClamp": 4,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "context_visual_a",
       "type": "image",
       "role": "context_visual",
       "x": 0,
       "y": 2,
-      "w": 4,
-      "h": 3,
+      "w": 2,
+      "h": 1,
       "style": "image",
       "crop": "cover",
       "zIndex": 1,
       "required": false
     },
     {
-      "slotId": "background_summary",
-      "type": "text",
-      "role": "background_summary",
-      "x": 5,
-      "y": 1,
-      "w": 4,
-      "h": 2,
-      "style": "body",
-      "zIndex": 4,
-      "required": true,
-      "textRules": {
-        "maxChars": 150,
-        "fontSize": 11,
-        "lineClamp": 6,
-        "overflow": "clip",
-        "padding": 8
-      }
-    },
-    {
-      "slotId": "key_statistic",
-      "type": "chart",
-      "role": "key_number",
-      "x": 9,
-      "y": 1,
-      "w": 3,
-      "h": 2,
-      "style": "chart",
-      "chartType": "percentage",
-      "zIndex": 3,
-      "required": false,
-      "textRules": {
-        "maxChars": 28,
-        "fontSize": 20,
-        "lineClamp": 2,
-        "overflow": "clip",
-        "padding": 8
-      }
-    },
-    {
-      "slotId": "research_divider",
-      "type": "divider",
-      "role": "divider",
-      "x": 5,
-      "y": 4,
-      "w": 7,
+      "slotId": "context_visual_b",
+      "type": "image",
+      "role": "context_visual",
+      "x": 2,
+      "y": 2,
+      "w": 2,
       "h": 1,
-      "style": "divider",
-      "zIndex": 2,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
       "required": false
     },
     {
-      "slotId": "section_heading",
-      "type": "text",
-      "role": "section_heading",
+      "slotId": "statistic_image_a",
+      "type": "image",
+      "role": "research_statistic_card",
+      "x": 0,
+      "y": 3,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "crop": "contain",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "statistic_image_b",
+      "type": "image",
+      "role": "research_statistic_card",
+      "x": 2,
+      "y": 3,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "crop": "contain",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "statistic_image_c",
+      "type": "image",
+      "role": "research_statistic_card",
       "x": 0,
       "y": 5,
-      "w": 3,
-      "h": 1,
-      "style": "heading",
-      "zIndex": 4,
-      "required": false,
-      "textRules": {
-        "maxChars": 32,
-        "fontSize": 16,
-        "lineClamp": 1,
-        "overflow": "clip",
-        "padding": 6
-      }
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "crop": "contain",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "statistic_image_d",
+      "type": "image",
+      "role": "research_statistic_card",
+      "x": 2,
+      "y": 5,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "crop": "contain",
+      "zIndex": 1,
+      "required": false
     },
     {
       "slotId": "evidence_caption",
       "type": "caption",
       "role": "evidence_explanation",
       "x": 0,
-      "y": 6,
-      "w": 3,
-      "h": 2,
+      "y": 7,
+      "w": 4,
+      "h": 1,
       "style": "caption",
       "zIndex": 4,
       "required": false,
       "textRules": {
-        "maxChars": 110,
-        "fontSize": 10,
-        "lineClamp": 5,
+        "maxChars": 100,
+        "fontSize": 9,
+        "lineClamp": 3,
         "overflow": "clip",
         "padding": 6
       }
+    },
+    {
+      "slotId": "category_collage_image",
+      "type": "image",
+      "role": "category_mapping_collage",
+      "x": 4,
+      "y": 0,
+      "w": 8,
+      "h": 3,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": true
+    },
+    {
+      "slotId": "category_summary_image",
+      "type": "image",
+      "role": "category_summary_or_chart",
+      "x": 4,
+      "y": 3,
+      "w": 8,
+      "h": 2,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
     },
     {
       "slotId": "research_question",
@@ -157,36 +197,145 @@
       "role": "design_opportunity_question",
       "x": 4,
       "y": 5,
-      "w": 5,
-      "h": 2,
+      "w": 8,
+      "h": 1,
       "style": "title",
       "zIndex": 5,
       "required": true,
       "textRules": {
-        "maxChars": 80,
+        "maxChars": 70,
         "fontSize": 18,
-        "lineClamp": 3,
-        "overflow": "clip",
-        "padding": 8
-      }
-    },
-    {
-      "slotId": "mapping_annotation",
-      "type": "annotation",
-      "role": "annotation_label",
-      "x": 9,
-      "y": 5,
-      "w": 3,
-      "h": 1,
-      "style": "annotation",
-      "zIndex": 5,
-      "required": false,
-      "textRules": {
-        "maxChars": 32,
-        "fontSize": 10,
         "lineClamp": 2,
         "overflow": "clip",
         "padding": 6
+      }
+    },
+    {
+      "slotId": "case_image_a",
+      "type": "image",
+      "role": "case_study_or_behavior_example",
+      "x": 4,
+      "y": 6,
+      "w": 2,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "case_image_b",
+      "type": "image",
+      "role": "case_study_or_behavior_example",
+      "x": 6,
+      "y": 6,
+      "w": 2,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "case_image_c",
+      "type": "image",
+      "role": "case_study_or_behavior_example",
+      "x": 8,
+      "y": 6,
+      "w": 2,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "case_image_d",
+      "type": "image",
+      "role": "case_study_or_behavior_example",
+      "x": 10,
+      "y": 6,
+      "w": 2,
+      "h": 1,
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false
+    },
+    {
+      "slotId": "case_caption_a",
+      "type": "caption",
+      "role": "case_study_caption",
+      "x": 4,
+      "y": 7,
+      "w": 2,
+      "h": 1,
+      "style": "caption",
+      "zIndex": 4,
+      "required": false,
+      "textRules": {
+        "maxChars": 55,
+        "fontSize": 9,
+        "lineClamp": 3,
+        "overflow": "clip",
+        "padding": 4
+      }
+    },
+    {
+      "slotId": "case_caption_b",
+      "type": "caption",
+      "role": "case_study_caption",
+      "x": 6,
+      "y": 7,
+      "w": 2,
+      "h": 1,
+      "style": "caption",
+      "zIndex": 4,
+      "required": false,
+      "textRules": {
+        "maxChars": 55,
+        "fontSize": 9,
+        "lineClamp": 3,
+        "overflow": "clip",
+        "padding": 4
+      }
+    },
+    {
+      "slotId": "case_caption_c",
+      "type": "caption",
+      "role": "case_study_caption",
+      "x": 8,
+      "y": 7,
+      "w": 2,
+      "h": 1,
+      "style": "caption",
+      "zIndex": 4,
+      "required": false,
+      "textRules": {
+        "maxChars": 55,
+        "fontSize": 9,
+        "lineClamp": 3,
+        "overflow": "clip",
+        "padding": 4
+      }
+    },
+    {
+      "slotId": "case_caption_d",
+      "type": "caption",
+      "role": "case_study_caption",
+      "x": 10,
+      "y": 7,
+      "w": 2,
+      "h": 1,
+      "style": "caption",
+      "zIndex": 4,
+      "required": false,
+      "textRules": {
+        "maxChars": 55,
+        "fontSize": 9,
+        "lineClamp": 3,
+        "overflow": "clip",
+        "padding": 4
       }
     }
   ],
@@ -194,17 +343,26 @@
     "required": [
       "page_title",
       "background_summary",
-      "evidence_or_mapping",
+      "category_collage_image",
       "research_question"
     ],
     "optional": [
-      "context_visual",
-      "key_statistics",
-      "category_map",
-      "timeline_map",
-      "case_study_grid",
-      "trend_chart",
-      "comparison_chart"
+      "context_visual_a",
+      "context_visual_b",
+      "statistic_image_a",
+      "statistic_image_b",
+      "statistic_image_c",
+      "statistic_image_d",
+      "category_summary_image",
+      "evidence_caption",
+      "case_image_a",
+      "case_image_b",
+      "case_image_c",
+      "case_image_d",
+      "case_caption_a",
+      "case_caption_b",
+      "case_caption_c",
+      "case_caption_d"
     ]
   },
   "slots": {
@@ -221,22 +379,14 @@
         "id": "background_summary",
         "role": "background_summary",
         "required": true,
-        "maxWords": 90,
+        "maxWords": 55,
         "fontSizeLevel": "body"
-      },
-      {
-        "id": "section_heading",
-        "role": "section_heading",
-        "required": false,
-        "maxWords": 8,
-        "fontSizeLevel": "medium",
-        "fontStyle": "bold"
       },
       {
         "id": "evidence_caption",
         "role": "evidence_explanation",
         "required": false,
-        "maxWords": 35,
+        "maxWords": 24,
         "fontSizeLevel": "small"
       },
       {
@@ -246,51 +396,139 @@
         "maxWords": 20,
         "fontSizeLevel": "large",
         "fontStyle": "bold_italic"
+      },
+      {
+        "id": "case_caption_a",
+        "role": "case_study_caption",
+        "required": false,
+        "maxWords": 12,
+        "fontSizeLevel": "small"
+      },
+      {
+        "id": "case_caption_b",
+        "role": "case_study_caption",
+        "required": false,
+        "maxWords": 12,
+        "fontSizeLevel": "small"
+      },
+      {
+        "id": "case_caption_c",
+        "role": "case_study_caption",
+        "required": false,
+        "maxWords": 12,
+        "fontSizeLevel": "small"
+      },
+      {
+        "id": "case_caption_d",
+        "role": "case_study_caption",
+        "required": false,
+        "maxWords": 12,
+        "fontSizeLevel": "small"
       }
     ],
     "imageSlots": [
       {
-        "id": "context_visual",
+        "id": "context_visual_a",
         "role": "context_visual",
         "required": false,
         "contentType": "photo_or_render",
-        "priority": "high",
+        "priority": "medium",
         "cropStyle": "landscape"
       },
       {
-        "id": "case_study_image",
-        "role": "existing_case_or_precedent",
+        "id": "context_visual_b",
+        "role": "context_visual",
+        "required": false,
+        "contentType": "photo_or_render",
+        "priority": "medium",
+        "cropStyle": "landscape"
+      },
+      {
+        "id": "statistic_image_a",
+        "role": "research_statistic_or_chart_image",
+        "required": false,
+        "contentType": "chart_or_infographic_or_photo",
+        "priority": "medium",
+        "cropStyle": "square_or_circle_card"
+      },
+      {
+        "id": "statistic_image_b",
+        "role": "research_statistic_or_chart_image",
+        "required": false,
+        "contentType": "chart_or_infographic_or_photo",
+        "priority": "medium",
+        "cropStyle": "square_or_circle_card"
+      },
+      {
+        "id": "statistic_image_c",
+        "role": "research_statistic_or_chart_image",
+        "required": false,
+        "contentType": "chart_or_infographic_or_photo",
+        "priority": "medium",
+        "cropStyle": "square_or_circle_card"
+      },
+      {
+        "id": "statistic_image_d",
+        "role": "research_statistic_or_chart_image",
+        "required": false,
+        "contentType": "chart_or_infographic_or_photo",
+        "priority": "medium",
+        "cropStyle": "square_or_circle_card"
+      },
+      {
+        "id": "category_collage_image",
+        "role": "large_category_mapping_collage",
+        "required": true,
+        "contentType": "photo_collage_or_diagram_export",
+        "priority": "highest",
+        "cropStyle": "wide_landscape"
+      },
+      {
+        "id": "category_summary_image",
+        "role": "summary_diagram_or_secondary_collage",
+        "required": false,
+        "contentType": "diagram_chart_or_collage",
+        "priority": "high",
+        "cropStyle": "wide_landscape"
+      },
+      {
+        "id": "case_image_a",
+        "role": "case_study_or_behavior_example",
         "required": false,
         "contentType": "photo",
         "priority": "medium",
-        "cropStyle": "rectangle_or_square"
-      }
-    ],
-    "dataSlots": [
+        "cropStyle": "landscape"
+      },
       {
-        "id": "key_statistic",
-        "role": "key_number",
+        "id": "case_image_b",
+        "role": "case_study_or_behavior_example",
         "required": false,
-        "format": "percentage_or_large_number",
-        "visualStyle": "large_number_card"
-      }
-    ],
-    "mappingSlots": [
+        "contentType": "photo",
+        "priority": "medium",
+        "cropStyle": "landscape"
+      },
       {
-        "id": "category_map",
-        "role": "classification_mapping",
+        "id": "case_image_c",
+        "role": "case_study_or_behavior_example",
         "required": false,
-        "structure": "horizontal_category_map",
-        "maxCategories": 8,
-        "supportsCutoutImages": true,
-        "supportsLabels": true
+        "contentType": "photo",
+        "priority": "medium",
+        "cropStyle": "landscape"
+      },
+      {
+        "id": "case_image_d",
+        "role": "case_study_or_behavior_example",
+        "required": false,
+        "contentType": "photo",
+        "priority": "medium",
+        "cropStyle": "landscape"
       }
     ]
   },
   "styleRules": {
     "background": "light_or_dark",
     "visualDensity": "high",
-    "layoutStyle": "research_board_infographic",
+    "layoutStyle": "split_background_and_photo_collage_research_board",
     "typography": {
       "title": "bold_italic",
       "sectionHeading": "bold",
@@ -315,14 +553,30 @@
   },
   "aiGenerationRules": {
     "mainLogic": "explain_why_this_problem_or_opportunity_exists",
-    "layoutLogic": "research_information_mapping",
+    "layoutLogic": "left_background_statistics_right_large_collage_and_case_examples",
     "prioritizeTextHierarchy": true,
     "prioritizeEvidenceVisibility": true,
+    "prioritizeUploadedImages": true,
     "allowHighDensityLayout": true,
     "allowMixedMedia": true,
     "allowCharts": true,
     "allowTimelines": true,
     "allowCategoryMaps": true,
+    "treatChartsAndCollagesAsImages": true,
+    "imageHierarchy": [
+      "category_collage_image",
+      "category_summary_image",
+      "context_visual_a",
+      "context_visual_b",
+      "statistic_image_a",
+      "statistic_image_b",
+      "statistic_image_c",
+      "statistic_image_d",
+      "case_image_a",
+      "case_image_b",
+      "case_image_c",
+      "case_image_d"
+    ],
     "avoid": [
       "project-specific topic summary",
       "decorative images without research purpose",
