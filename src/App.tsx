@@ -56,6 +56,8 @@ type CanvasOrientation = 'landscape' | 'portrait';
 type LayoutMode = 'strict' | 'editorial';
 type SidebarMode = 'generate' | 'edit';
 type PageStage = 'discover' | 'define' | 'develop' | 'deliver';
+type Language = 'zh' | 'en';
+type ReferenceMode = 'template' | 'upload';
 type ImageAssetRole = 'hero' | 'support' | 'texture' | 'reference';
 type TextAssetRole = 'title' | 'subtitle' | 'body' | 'caption' | 'label';
 
@@ -78,6 +80,14 @@ type TextAsset = {
 const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
 const isTextBlock = (type: LayoutBlock['type']) => TEXT_BLOCK_TYPES.includes(type);
 const createLocalId = () => Math.random().toString(36).slice(2, 10);
+const isInteractiveTarget = (target: EventTarget | null) => (
+  target instanceof HTMLInputElement ||
+  target instanceof HTMLTextAreaElement ||
+  target instanceof HTMLSelectElement ||
+  target instanceof HTMLButtonElement ||
+  target instanceof HTMLAnchorElement ||
+  (target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, button, a, [contenteditable="true"]')))
+);
 
 const CANVAS_PRESETS: Array<{
   id: CanvasPresetId;
@@ -100,6 +110,133 @@ const STAGE_TEMPLATE_MAP: Record<PageStage, string> = {
   develop: 'develop_prototype_demo_16x9',
   deliver: 'deliver_final_outcome_16x9'
 };
+
+const UI_TEXT = {
+  zh: {
+    undo: '撤回',
+    redo: '重做',
+    viewport: '版面',
+    scale: '缩放',
+    fit: '适应',
+    visibility: '网格',
+    guide: '指南',
+    workflow: '工作流',
+    aiGenerate: 'AI 生成',
+    freeEdit: '自由编辑',
+    reference: '1. 参考',
+    template: '模板',
+    ownReference: '上传参考',
+    templateHelp: '选择 4 个阶段匹配的模板。',
+    ownReferenceHelp: '上传自己的排版参考，AI 会先理解参考图并直接生成 JSON。',
+    selectTemplate: '选择模板',
+    uploadReference: '上传参考图',
+    assets: '2. 素材',
+    uploadImages: '上传图片',
+    useTextAssets: '使用文字素材',
+    useTextAssetsHelp: '开启后可以上传标题、正文和说明文字。',
+    addText: '添加文字',
+    generate: '生成排版',
+    updateWithAI: '用 AI 修改',
+    aiEdit: '3. AI 修改',
+    generateInfo: '第一次生成不需要输入提示词。选择参考方式并上传素材后，点击左下方生成排版。',
+    aiPlaceholder: '描述希望 AI 修改的方向，例如：让图片更密集、减少文字、突出右侧主视觉...',
+    inspector: '参数调整',
+    selectElement: '选择元素',
+    selectedBlocks: '已选择区块',
+    layerOrder: '图层顺序',
+    imageTransform: '图片调整',
+    textLayer: '文本层',
+    background: '背景',
+    padding: '内边距',
+    lineClamp: '行数限制',
+    typeface: '字体',
+    weight: '字重',
+    style: '样式',
+    color: '颜色',
+    size: '字号',
+    alignment: '对齐',
+    content: '内容 / 信息',
+    blockLabel: '区块文字',
+    hyperlink: '链接',
+    export: '导出',
+    exportSvg: '导出 SVG',
+    exportPdf: '导出 PDF 规格',
+    replaceImage: '替换图片',
+    fitMode: '适配模式',
+    basicBlocks: '基础区块',
+    layoutMode: '排版模式',
+    stages: {
+      discover: '发现',
+      define: '定义',
+      develop: '发展',
+      deliver: '交付',
+    },
+    autoMatch: '自动匹配',
+    loading: '加载中',
+  },
+  en: {
+    undo: 'Undo',
+    redo: 'Redo',
+    viewport: 'Viewport',
+    scale: 'Scale',
+    fit: 'Fit',
+    visibility: 'Grid',
+    guide: 'Guide',
+    workflow: 'Workflow',
+    aiGenerate: 'AI Generate',
+    freeEdit: 'Free Edit',
+    reference: '1. Reference',
+    template: 'Template',
+    ownReference: 'Upload Reference',
+    templateHelp: 'Choose a template matched to the four stages.',
+    ownReferenceHelp: 'Upload your own layout reference. AI reads it first and generates JSON directly.',
+    selectTemplate: 'Select Template',
+    uploadReference: 'Upload Reference Images',
+    assets: '2. Assets',
+    uploadImages: 'Upload Images',
+    useTextAssets: 'Use Text Assets',
+    useTextAssetsHelp: 'Enable this to upload titles, body copy, and captions.',
+    addText: 'Add Text',
+    generate: 'Generate Layout',
+    updateWithAI: 'Update with AI',
+    aiEdit: '3. AI Edit',
+    generateInfo: 'No prompt is needed for the first generation. Choose a reference mode, upload assets, then use the bottom generate button.',
+    aiPlaceholder: 'Describe how AI should revise the layout, e.g. make images denser, reduce text, emphasize the right hero image...',
+    inspector: 'Parametric Inspector',
+    selectElement: 'Select Element',
+    selectedBlocks: 'Blocks Selected',
+    layerOrder: 'Layer Order',
+    imageTransform: 'Image Transform',
+    textLayer: 'Text Layer',
+    background: 'Background',
+    padding: 'Padding',
+    lineClamp: 'Line Clamp',
+    typeface: 'Typeface',
+    weight: 'Weight',
+    style: 'Style',
+    color: 'Color',
+    size: 'Size',
+    alignment: 'Alignment',
+    content: 'Content / Metadata',
+    blockLabel: 'Block Label',
+    hyperlink: 'Hyperlink',
+    export: 'Export',
+    exportSvg: 'Export SVG',
+    exportPdf: 'Export PDF Spec',
+    replaceImage: 'Replace Image',
+    fitMode: 'Fit Mode',
+    basicBlocks: 'Basic Blocks',
+    layoutMode: 'Layout Mode',
+    stages: {
+      discover: 'Discover',
+      define: 'Define',
+      develop: 'Develop',
+      deliver: 'Deliver',
+    },
+    autoMatch: 'Auto match',
+    loading: 'Loading',
+  }
+} as const;
 
 const resolveCanvasSize = (
   preset: typeof CANVAS_PRESETS[number],
@@ -190,6 +327,7 @@ export default function App() {
   const [zoom, setZoom] = useState(0.85);
   const [isLocked, setIsLocked] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('editorial');
+  const [language, setLanguage] = useState<Language>('zh');
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem('gridSysGuideSeen') !== '1');
   const [canvasPresetId, setCanvasPresetId] = useState<CanvasPresetId>('digital-16-9');
   const [canvasOrientation, setCanvasOrientation] = useState<CanvasOrientation>('landscape');
@@ -218,7 +356,7 @@ export default function App() {
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
   const [pageStage, setPageStage] = useState<PageStage>('discover');
-  const [referenceEnabled, setReferenceEnabled] = useState(false);
+  const [referenceMode, setReferenceMode] = useState<ReferenceMode>('template');
   const [textAssetsEnabled, setTextAssetsEnabled] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     pageType: false,
@@ -272,6 +410,9 @@ export default function App() {
     selectedIds.length === 1 ? blocks.find(b => b.id === selectedIds[0]) : null, 
     [blocks, selectedIds]
   );
+  const isSelectedTextBlock = selectedBlock ? isTextBlock(selectedBlock.type) : false;
+  const isSelectedImageBlock = selectedBlock?.type === 'image';
+  const t = UI_TEXT[language];
 
   useEffect(() => {
     blocksRef.current = blocks;
@@ -967,7 +1108,8 @@ export default function App() {
       const analysis = analyzeProjectContent(userMessage);
       const contentJSON = buildContentJSON(userMessage, analysis.detectedStage);
       const layoutImageAssets = imageAssets.filter(asset => asset.role !== 'reference');
-      const referenceImageAssets = referenceEnabled
+      const useOwnReference = referenceMode === 'upload';
+      const referenceImageAssets = useOwnReference
         ? imageAssets.filter(asset => asset.role === 'reference')
         : [];
       const response = await fetch('/api/generate-layout', {
@@ -978,7 +1120,7 @@ export default function App() {
         body: JSON.stringify({
           prompt: userMessage,
           selectedTemplateId,
-          referenceEnabled,
+          referenceMode,
           contentJSON,
           textAssets: (textAssetsEnabled ? textAssets : []).map(asset => ({
             id: asset.id,
@@ -1019,7 +1161,9 @@ export default function App() {
       selectOnly(null);
       setChatMessages(prev => [...prev, {
         role: 'ai',
-        text: `AI 已生成 Render JSON。模板参考：${template?.templateMeta.templateName || result.selectedTemplate}。${result.reasoning || ''}`
+        text: language === 'zh'
+          ? `AI 已生成 Render JSON。参考方式：${useOwnReference ? '上传参考' : (template?.templateMeta.templateName || result.selectedTemplate)}。${result.reasoning || ''}`
+          : `AI generated Render JSON. Reference mode: ${useOwnReference ? 'uploaded reference' : (template?.templateMeta.templateName || result.selectedTemplate)}. ${result.reasoning || ''}`
       }]);
     } catch (err: any) {
       setChatMessages(prev => [...prev, { role: 'ai', text: `生成失败: ${err.message}` }]);
@@ -1031,8 +1175,8 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen bg-swiss-grey-base text-swiss-black overflow-hidden select-none">
       {/* Top Bar */}
-      <nav className="fixed top-0 left-0 right-0 h-[52px] bg-[#111] border-b border-[#333] text-white flex items-center justify-between px-6 z-50">
-        <div className="flex items-center gap-5 min-w-0">
+      <nav className="fixed top-0 left-0 right-0 h-[52px] bg-[#111] border-b border-[#333] text-white grid grid-cols-[1fr_auto_1fr] items-center px-6 z-50">
+        <div className="flex items-center gap-5 min-w-0 justify-self-start">
           <div className="flex items-center gap-2">
             <span className="font-black text-base tracking-widest uppercase">Grid.sys</span>
             <span className="bg-swiss-red text-white px-1.5 py-0.5 rounded-[2px] text-[10px] font-bold">V2.4</span>
@@ -1046,7 +1190,7 @@ export default function App() {
               title="撤回上一步"
             >
               <Undo2 size={13} strokeWidth={3} />
-              UNDO
+              {t.undo}
             </button>
             <button
               onClick={redo}
@@ -1055,66 +1199,66 @@ export default function App() {
               title="重做下一步"
             >
               <Redo2 size={13} strokeWidth={3} />
-              REDO
+              {t.redo}
             </button>
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-white/70">
-            <span className="hidden xl:inline">VIEWPORT: {canvasViewportLabel}</span>
-            <div className="flex border border-white/15 bg-white/5">
-              {CANVAS_PRESETS.map(preset => (
-                <button
-                  key={preset.id}
-                  onClick={() => selectCanvasPreset(preset)}
-                  className={`px-2.5 py-1 text-[10px] font-black font-mono transition-colors ${
-                    canvasPresetId === preset.id
-                      ? 'bg-swiss-red text-white'
-                      : 'text-white/55 hover:text-white hover:bg-white/10'
-                  }`}
-                  title={`${preset.viewportLabel} ${preset.width}x${preset.height}px`}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex border border-white/15 bg-white/5">
-              {[
-                { value: 'landscape' as const, label: 'H' },
-                { value: 'portrait' as const, label: 'V' },
-              ].map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => setCanvasOrientation(option.value)}
-                  className={`px-2 py-1 text-[10px] font-black font-mono transition-colors ${
-                    canvasOrientation === option.value
-                      ? 'bg-swiss-red text-white'
-                      : 'text-white/55 hover:text-white hover:bg-white/10'
-                  }`}
-                  title={option.value === 'landscape' ? '横放' : '竖放'}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-6 text-[11px] font-bold uppercase tracking-wider text-white/50">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-white/70 justify-self-center">
+          <span className="hidden xl:inline">{t.viewport}: {canvasViewportLabel}</span>
+          <div className="flex border border-white/15 bg-white/5">
+            {CANVAS_PRESETS.map(preset => (
+              <button
+                key={preset.id}
+                onClick={() => selectCanvasPreset(preset)}
+                className={`px-2.5 py-1 text-[10px] font-black font-mono transition-colors ${
+                  canvasPresetId === preset.id
+                    ? 'bg-swiss-red text-white'
+                    : 'text-white/55 hover:text-white hover:bg-white/10'
+                }`}
+                title={`${preset.viewportLabel} ${preset.width}x${preset.height}px`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex border border-white/15 bg-white/5">
+            {[
+              { value: 'landscape' as const, label: 'H' },
+              { value: 'portrait' as const, label: 'V' },
+            ].map(option => (
+              <button
+                key={option.value}
+                onClick={() => setCanvasOrientation(option.value)}
+                className={`px-2 py-1 text-[10px] font-black font-mono transition-colors ${
+                  canvasOrientation === option.value
+                    ? 'bg-swiss-red text-white'
+                    : 'text-white/55 hover:text-white hover:bg-white/10'
+                }`}
+                title={option.value === 'landscape' ? (language === 'zh' ? '横放' : 'Landscape') : (language === 'zh' ? '竖放' : 'Portrait')}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-5 text-[11px] font-bold uppercase tracking-wider text-white/50 justify-self-end">
           <div className="flex items-center gap-3 text-white/70">
             <button 
               onClick={() => handleZoom(-0.05)}
               className="hover:text-swiss-red transition-colors"
-              title="缩小"
+              title={language === 'zh' ? '缩小' : 'Zoom out'}
             >
               <Minus size={12} strokeWidth={4} />
             </button>
             <span className="font-mono tabular-nums min-w-[68px] text-center">
-              {Math.round(zoom * 100)}% SCALE
+              {Math.round(zoom * 100)}% {t.scale}
             </span>
             <button 
               onClick={() => handleZoom(0.05)}
               className="hover:text-swiss-red transition-colors"
-              title="放大"
+              title={language === 'zh' ? '放大' : 'Zoom in'}
             >
               <Plus size={12} strokeWidth={4} />
             </button>
@@ -1123,12 +1267,12 @@ export default function App() {
               className="px-2 py-1 border border-white/15 text-white/60 hover:text-white hover:border-swiss-red transition-colors"
               title="Fit canvas to screen"
             >
-              FIT
+              {t.fit}
             </button>
           </div>
 
           <div className="flex items-center gap-3">
-            <span>Grid Visibility</span>
+            <span>{t.visibility}</span>
             <div 
               onClick={() => setShowGrid(!showGrid)}
               className="w-9 h-4.5 bg-[#333] border border-[#444] relative cursor-pointer"
@@ -1142,14 +1286,24 @@ export default function App() {
           <button
             onClick={() => setShowGuide(true)}
             className="flex items-center gap-1 text-white/60 hover:text-white transition-colors"
-            title="新手导航"
+            title={language === 'zh' ? '新手导航' : 'Guide'}
           >
             <HelpCircle size={14} />
-            GUIDE
+            {t.guide}
           </button>
 
-          <div className="hidden 2xl:block text-[10px] opacity-60">
-            UNSAVED CHANGES • FILE: HCI_PORTFOLIO_DRAFT
+          <div className="flex border border-white/15 bg-white/5">
+            {(['zh', 'en'] as Language[]).map(option => (
+              <button
+                key={option}
+                onClick={() => setLanguage(option)}
+                className={`px-2 py-1 text-[10px] font-black transition-colors ${
+                  language === option ? 'bg-white text-[#111]' : 'text-white/55 hover:text-white'
+                }`}
+              >
+                {option === 'zh' ? '中文' : 'EN'}
+              </button>
+            ))}
           </div>
         </div>
       </nav>
@@ -1158,13 +1312,13 @@ export default function App() {
       <aside className="fixed left-0 top-[52px] bottom-0 w-[300px] glass-panel z-40 flex flex-col overflow-hidden">
         <div className="p-4 border-b border-swiss-black/5 bg-white/60">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[11px] font-extrabold uppercase tracking-widest text-swiss-black/45">Workflow</h2>
+            <h2 className="text-[11px] font-extrabold uppercase tracking-widest text-swiss-black/45">{t.workflow}</h2>
             <Search size={14} className="opacity-30" />
           </div>
           <div className="grid grid-cols-2 gap-1">
             {[
-              { value: 'generate' as const, label: 'AI Generate' },
-              { value: 'edit' as const, label: 'Free Edit' },
+              { value: 'generate' as const, label: t.aiGenerate },
+              { value: 'edit' as const, label: t.freeEdit },
             ].map(mode => (
               <button
                 key={mode.value}
@@ -1181,108 +1335,115 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 scrollbar-hide space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 pb-24 scrollbar-hide space-y-4">
           {sidebarMode === 'generate' ? (
             <>
               <CollapsibleSection
-                title="1. Page Type"
+                title={t.reference}
                 icon={<LayoutGrid size={13} />}
                 collapsed={collapsedSections.pageType}
                 onToggle={() => toggleSection('pageType')}
-                meta={pageStage.toUpperCase()}
+                meta={referenceMode === 'template' ? t.template : t.ownReference}
               >
-                <div className="grid grid-cols-2 gap-1">
-                  {(['discover', 'define', 'develop', 'deliver'] as PageStage[]).map(stage => {
-                    const templateId = STAGE_TEMPLATE_MAP[stage];
-                    const template = availableTemplates.find(item => item.templateMeta.templateId === templateId);
-                    return (
-                      <button
-                        key={stage}
-                        onClick={() => selectPageStage(stage)}
-                        className={`min-h-12 border p-2 text-left transition-colors ${
-                          pageStage === stage
-                            ? 'bg-swiss-red text-white border-swiss-red'
-                            : 'bg-white/60 text-swiss-black border-swiss-black/10 hover:border-swiss-red'
-                        }`}
-                      >
-                        <span className="block text-[10px] font-black uppercase tracking-widest">{stage}</span>
-                        <span className={`block mt-1 text-[8px] leading-tight ${
-                          pageStage === stage ? 'text-white/75' : 'text-swiss-black/35'
-                        }`}>
-                          {template ? template.templateMeta.templateName : stage === 'define' ? 'Auto match' : 'Loading'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <select
-                  value={selectedTemplateId}
-                  onChange={(event) => setSelectedTemplateId(event.target.value)}
-                  className="mt-2 w-full h-8 bg-white border border-swiss-black/10 px-2 text-[10px] font-black uppercase outline-none focus:border-swiss-red"
-                >
-                  <option value="auto">AI Select Template</option>
-                  {availableTemplates.map(template => (
-                    <option key={template.templateMeta.templateId} value={template.templateMeta.templateId}>
-                      {template.templateMeta.templateName}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-3 border-t border-swiss-black/10 pt-3">
-                  <button
-                    onClick={() => setReferenceEnabled(prev => !prev)}
-                    className="w-full flex items-center justify-between text-left"
-                  >
-                    <span>
-                      <span className="block text-[9px] font-black uppercase tracking-widest text-swiss-black/55">Use Reference Layout</span>
-                      <span className="block mt-1 text-[9px] leading-tight text-swiss-black/35">
-                        开启后上传排版参考，AI 会优先参考图片和文字的排布。
+                <div className="grid grid-cols-2 gap-1 mb-3">
+                  {[
+                    { value: 'template' as const, label: t.template, help: t.templateHelp },
+                    { value: 'upload' as const, label: t.ownReference, help: t.ownReferenceHelp },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setReferenceMode(option.value)}
+                      className={`min-h-12 border p-2 text-left transition-colors ${
+                        referenceMode === option.value
+                          ? 'bg-swiss-red text-white border-swiss-red'
+                          : 'bg-white/60 text-swiss-black border-swiss-black/10 hover:border-swiss-red'
+                      }`}
+                    >
+                      <span className="block text-[10px] font-black uppercase tracking-widest">{option.label}</span>
+                      <span className={`block mt-1 text-[8px] leading-tight ${
+                        referenceMode === option.value ? 'text-white/75' : 'text-swiss-black/35'
+                      }`}>
+                        {option.help}
                       </span>
-                    </span>
-                    <span className={`relative block w-9 h-4.5 border transition-colors ${
-                      referenceEnabled ? 'bg-swiss-red border-swiss-red' : 'bg-white border-swiss-black/20'
-                    }`}>
-                      <span className={`absolute top-[2px] w-3 h-3 bg-swiss-black transition-all ${
-                        referenceEnabled ? 'left-[20px] bg-white' : 'left-[2px]'
-                      }`} />
-                    </span>
-                  </button>
-                  {referenceEnabled && (
-                    <div className="mt-3">
-                      <button
-                        onClick={() => {
-                          const input = document.createElement('input');
-                          input.type = 'file';
-                          input.accept = 'image/*';
-                          input.multiple = true;
-                          input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || [], 'reference');
-                          input.click();
-                        }}
-                        className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
-                      >
-                        <Upload size={13} />
-                        Add Reference Images
-                      </button>
-                      <div className="grid grid-cols-3 gap-2 mt-3">
-                        {imageAssets.filter(asset => asset.role === 'reference').map(asset => (
-                          <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
-                            <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
-                            <button
-                              onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
-                              className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                              title="Remove reference"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    </button>
+                  ))}
                 </div>
+
+                {referenceMode === 'template' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-1">
+                      {(['discover', 'define', 'develop', 'deliver'] as PageStage[]).map(stage => {
+                        const templateId = STAGE_TEMPLATE_MAP[stage];
+                        const template = availableTemplates.find(item => item.templateMeta.templateId === templateId);
+                        return (
+                          <button
+                            key={stage}
+                            onClick={() => selectPageStage(stage)}
+                            className={`min-h-12 border p-2 text-left transition-colors ${
+                              pageStage === stage
+                                ? 'bg-swiss-red text-white border-swiss-red'
+                                : 'bg-white/60 text-swiss-black border-swiss-black/10 hover:border-swiss-red'
+                            }`}
+                          >
+                            <span className="block text-[10px] font-black uppercase tracking-widest">{t.stages[stage]}</span>
+                            <span className={`block mt-1 text-[8px] leading-tight ${
+                              pageStage === stage ? 'text-white/75' : 'text-swiss-black/35'
+                            }`}>
+                              {template ? template.templateMeta.templateName : stage === 'define' ? t.autoMatch : t.loading}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(event) => setSelectedTemplateId(event.target.value)}
+                      className="mt-2 w-full h-8 bg-white border border-swiss-black/10 px-2 text-[10px] font-black uppercase outline-none focus:border-swiss-red"
+                    >
+                      <option value="auto">{t.selectTemplate}</option>
+                      {availableTemplates.map(template => (
+                        <option key={template.templateMeta.templateId} value={template.templateMeta.templateId}>
+                          {template.templateMeta.templateName}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <div className="border-t border-swiss-black/10 pt-3">
+                    <button
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.multiple = true;
+                        input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || [], 'reference');
+                        input.click();
+                      }}
+                      className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
+                    >
+                      <Upload size={13} />
+                      {t.uploadReference}
+                    </button>
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                      {imageAssets.filter(asset => asset.role === 'reference').map(asset => (
+                        <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
+                          <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
+                          <button
+                            onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                            className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            title={language === 'zh' ? '移除参考图' : 'Remove reference'}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CollapsibleSection>
 
               <CollapsibleSection
-                title="2. Assets"
+                title={t.assets}
                 icon={<ImageIcon size={13} />}
                 collapsed={collapsedSections.assets}
                 onToggle={() => toggleSection('assets')}
@@ -1300,7 +1461,7 @@ export default function App() {
                   className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
                 >
                   <Upload size={13} />
-                  Upload Images
+                  {t.uploadImages}
                 </button>
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   {imageAssets.filter(asset => asset.role !== 'reference').map(asset => (
@@ -1309,7 +1470,7 @@ export default function App() {
                       <button
                         onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
                         className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                        title="Remove image"
+                        title={language === 'zh' ? '移除图片' : 'Remove image'}
                       >
                         <X size={12} />
                       </button>
@@ -1335,9 +1496,9 @@ export default function App() {
                     className="w-full flex items-center justify-between text-left"
                   >
                     <span>
-                      <span className="block text-[9px] font-black uppercase tracking-widest text-swiss-black/55">Use Text Assets</span>
+                      <span className="block text-[9px] font-black uppercase tracking-widest text-swiss-black/55">{t.useTextAssets}</span>
                       <span className="block mt-1 text-[9px] leading-tight text-swiss-black/35">
-                        开启后可以上传标题、正文和说明文字。
+                        {t.useTextAssetsHelp}
                       </span>
                     </span>
                     <span className={`relative block w-9 h-4.5 border transition-colors ${
@@ -1368,7 +1529,7 @@ export default function App() {
                       <textarea
                         value={newTextAsset}
                         onChange={(event) => setNewTextAsset(event.target.value)}
-                        placeholder="粘贴标题、正文、说明文字..."
+                        placeholder={language === 'zh' ? '粘贴标题、正文、说明文字...' : 'Paste titles, body copy, captions...'}
                         className="w-full h-20 resize-none bg-white/70 border border-swiss-black/10 p-2 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-swiss-black/25"
                       />
                       <button
@@ -1376,7 +1537,7 @@ export default function App() {
                         disabled={!newTextAsset.trim()}
                         className="mt-2 w-full h-8 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
                       >
-                        Add Text
+                        {t.addText}
                       </button>
                       <div className="mt-3 space-y-2">
                         {textAssets.map(asset => (
@@ -1386,7 +1547,7 @@ export default function App() {
                               <button
                                 onClick={() => setTextAssets(prev => prev.filter(item => item.id !== asset.id))}
                                 className="text-swiss-black/25 hover:text-swiss-red"
-                                title="Remove text"
+                                title={language === 'zh' ? '移除文字' : 'Remove text'}
                               >
                                 <X size={12} />
                               </button>
@@ -1401,7 +1562,7 @@ export default function App() {
               </CollapsibleSection>
 
               <CollapsibleSection
-                title={lastRenderJSON ? "3. AI Edit" : "3. Generate"}
+                title={lastRenderJSON ? t.aiEdit : '3. AI'}
                 icon={<Zap size={13} />}
                 collapsed={collapsedSections.ai}
                 onToggle={() => toggleSection('ai')}
@@ -1416,27 +1577,16 @@ export default function App() {
                         callGeminiLayout(chatInput.trim());
                       }
                     }}
-                    placeholder="描述希望 AI 修改的方向，例如：让图片更密集、减少文字、突出右侧主视觉..."
+                    placeholder={t.aiPlaceholder}
                     className="w-full h-24 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
                   />
                 ) : (
                   <div className="border border-swiss-black/10 bg-white/60 p-3">
                     <p className="text-[10px] leading-snug text-swiss-black/55">
-                      第一次生成不需要输入提示词。选择页面类型，上传图片，需要时开启文字或参考图，然后直接生成排版。
+                      {t.generateInfo}
                     </p>
                   </div>
                 )}
-                <button
-                  onClick={() => {
-                    const defaultPrompt = `根据当前选择的 ${pageStage} 页面类型，使用已上传图片${textAssetsEnabled ? '和文字素材' : ''}${referenceEnabled ? '，并参考已上传的排版参考图' : ''}，生成一版作品集排版。`;
-                    const message = lastRenderJSON ? chatInput.trim() : defaultPrompt;
-                    if (message && !aiLoading) callGeminiLayout(message);
-                  }}
-                  disabled={aiLoading || (Boolean(lastRenderJSON) && !chatInput.trim())}
-                  className="mt-2 w-full h-9 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
-                >
-                  {lastRenderJSON ? 'Update with AI' : 'Generate Layout'}
-                </button>
                 {lastRenderJSON && (
                   <div className="mt-2 border border-swiss-black/10 bg-white/60 p-2">
                     <div className="flex items-center justify-between">
@@ -1468,21 +1618,26 @@ export default function App() {
           ) : (
             <>
               <CollapsibleSection
-                title="Basic Blocks"
+                title={t.basicBlocks}
                 icon={<Box size={13} />}
                 collapsed={collapsedSections.basicBlocks}
                 onToggle={() => toggleSection('basicBlocks')}
               >
                 <CategorySection
-                  title="Basic Blocks"
+                  title={t.basicBlocks}
                   icon={<Box size={14} />}
-                  items={['Text Block', 'Image Block', 'Blank Block']}
-                  onAdd={(item) => addBlock(item, 'Generic', item === 'Image Block' ? 'image' : item === 'Text Block' ? 'text' : 'blank')}
+                  items={language === 'zh' ? ['文本区块', '图片区块', '空白区块'] : ['Text Block', 'Image Block', 'Blank Block']}
+                  onAdd={(item) => {
+                    const normalized = language === 'zh'
+                      ? ({ '文本区块': 'Text Block', '图片区块': 'Image Block', '空白区块': 'Blank Block' } as Record<string, string>)[item]
+                      : item;
+                    addBlock(item, 'Generic', normalized === 'Image Block' ? 'image' : normalized === 'Text Block' ? 'text' : 'blank');
+                  }}
                 />
               </CollapsibleSection>
 
               <CollapsibleSection
-                title="Layout Mode"
+                title={t.layoutMode}
                 icon={<Layers size={13} />}
                 collapsed={collapsedSections.editLayout}
                 onToggle={() => toggleSection('editLayout')}
@@ -1512,6 +1667,21 @@ export default function App() {
               </CollapsibleSection>
             </>
           )}
+        </div>
+        <div className="absolute left-0 right-0 bottom-0 p-4 bg-white/85 border-t border-swiss-black/10 backdrop-blur">
+          <button
+            onClick={() => {
+              const defaultPrompt = language === 'zh'
+                ? `根据当前选择的 ${referenceMode === 'template' ? `${pageStage} 模板` : '上传参考图'}，使用已上传图片${textAssetsEnabled ? '和文字素材' : ''}，生成一版作品集排版。`
+                : `Generate a portfolio layout from the current ${referenceMode === 'template' ? `${pageStage} template` : 'uploaded reference image'}, using uploaded images${textAssetsEnabled ? ' and text assets' : ''}.`;
+              const message = lastRenderJSON ? chatInput.trim() : defaultPrompt;
+              if (message && !aiLoading) callGeminiLayout(message);
+            }}
+            disabled={aiLoading || (Boolean(lastRenderJSON) && !chatInput.trim())}
+            className="w-full h-11 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
+          >
+            {lastRenderJSON ? t.updateWithAI : t.generate}
+          </button>
         </div>
       </aside>
 
@@ -1598,6 +1768,7 @@ export default function App() {
                     }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
+                      if (isInteractiveTarget(e.target)) return;
                       handleDragStart(e, block.id);
                     }}
                   >
@@ -1692,9 +1863,10 @@ export default function App() {
                                     textAlign: block.textAlign || 'left',
                                     color: block.textColor || 'inherit',
                                   }}
-                                  className={`w-full bg-transparent border-none resize-none outline-none text-left leading-tight tracking-tighter uppercase placeholder:text-current placeholder:opacity-20 scrollbar-hide drag-handle cursor-move ${
+                                  className={`w-full bg-transparent border-none resize-none outline-none text-left leading-tight tracking-tighter uppercase placeholder:text-current placeholder:opacity-20 scrollbar-hide cursor-text ${
                                     blockOverflowMode === 'autoHeight' ? 'min-h-[44px] overflow-visible' : 'h-full'
                                   }`}
+                                  onMouseDown={(e) => e.stopPropagation()}
                                   onClick={(e) => e.stopPropagation()}
                                   onFocus={() => {
                                     if (block.label === 'TITLE BLOCK') updateBlock(block.id, { label: '' }, true);
@@ -1783,7 +1955,7 @@ export default function App() {
       {/* Sidebar Right: Inspector */}
       <aside className="fixed right-0 top-[52px] bottom-0 w-[260px] glass-panel z-40 p-6 flex flex-col overflow-hidden">
         <div className="mb-6">
-          <h2 className="section-label">Parametric Inspector</h2>
+          <h2 className="section-label">{t.inspector}</h2>
           {selectedBlock ? (
             <div className="flex items-center gap-2 py-2">
               <div className="w-2 h-2 bg-swiss-red" />
@@ -1791,17 +1963,19 @@ export default function App() {
             </div>
           ) : selectedIds.length > 1 ? (
             <div className="py-2 border-b border-black/5">
-              <span className="text-[10px] font-bold text-swiss-grey-dark uppercase tracking-widest">{selectedIds.length} BLOCKS SELECTED</span>
-              <p className="mt-2 text-[10px] leading-relaxed text-swiss-black/45">拖动任一已选区块即可整体移动。按住 Shift 或 Command 点击区块可增减选择。</p>
+              <span className="text-[10px] font-bold text-swiss-grey-dark uppercase tracking-widest">{selectedIds.length} {t.selectedBlocks}</span>
+              <p className="mt-2 text-[10px] leading-relaxed text-swiss-black/45">
+                {language === 'zh' ? '拖动任一已选区块即可整体移动。按住 Shift 或 Command 点击区块可增减选择。' : 'Drag any selected block to move the group. Hold Shift or Command to add or remove blocks.'}
+              </p>
             </div>
           ) : (
             <div className="py-2 border-b border-black/5">
-              <span className="text-[10px] font-bold text-swiss-grey-dark uppercase tracking-widest">Select Element</span>
+              <span className="text-[10px] font-bold text-swiss-grey-dark uppercase tracking-widest">{t.selectElement}</span>
             </div>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6">
+        <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 pb-4">
           {selectedBlock ? (
             <>
               <div className="space-y-0 px-1">
@@ -1857,7 +2031,7 @@ export default function App() {
 
               <div className="space-y-3 pt-4 border-t border-swiss-black/10">
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">LAYER ORDER</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">{t.layerOrder}</span>
                   <span className="font-mono text-[9px] font-bold text-swiss-red">Z:{selectedBlock.zIndex || 1}</span>
                 </div>
                 <div className="grid grid-cols-4 gap-1">
@@ -1880,7 +2054,7 @@ export default function App() {
 
               {selectedBlock?.type === 'image' && selectedBlock.imageUrl && (
                 <div className="space-y-3 pt-4 border-t border-swiss-black/10">
-                  <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">IMAGE TRANSFORM</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">{t.imageTransform}</span>
 
                   {/* 旋转 4档 */}
                   <div>
@@ -1932,7 +2106,7 @@ export default function App() {
                   <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">TYPOGRAPHY</span>
 
                   <div>
-                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">TEXT LAYER</span>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">{t.textLayer}</span>
                     <div className="grid grid-cols-3 gap-1">
                       {[
                         { value: 'visible', label: 'VISIBLE' },
@@ -1955,7 +2129,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">BACKGROUND</span>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">{t.background}</span>
                     <div className="grid grid-cols-6 gap-1">
                       {['transparent', '#FFFFFF', '#FFF3C4', '#1040FF', '#FF3333', '#111111'].map(color => (
                         <button
@@ -1981,7 +2155,7 @@ export default function App() {
                   </div>
 
                   <PrecisionSlider
-                    label="Padding [PX]"
+                    label={`${t.padding} [PX]`}
                     min={0}
                     max={48}
                     value={selectedBlock.padding ?? 8}
@@ -1989,7 +2163,7 @@ export default function App() {
                   />
 
                   <PrecisionSlider
-                    label="Line Clamp"
+                    label={t.lineClamp}
                     min={0}
                     max={8}
                     value={selectedBlock.lineClamp ?? 0}
@@ -1998,7 +2172,7 @@ export default function App() {
 
                   {/* 字体选择 */}
                   <div>
-                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">TYPEFACE</span>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">{t.typeface}</span>
                     <div className="grid grid-cols-2 gap-1">
                       {[
                         { label: 'INTER', value: 'Inter, sans-serif' },
@@ -2024,7 +2198,7 @@ export default function App() {
 
                   {/* 字重 */}
                   <div>
-                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">WEIGHT</span>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">{t.weight}</span>
                     <div className="grid grid-cols-2 gap-1">
                       {(['normal','bold'] as const).map(w => (
                         <button
@@ -2045,7 +2219,7 @@ export default function App() {
 
                   {/* 字行 */}
                   <div>
-                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">STYLE</span>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">{t.style}</span>
                     <div className="grid grid-cols-2 gap-1">
                       {[
                         { value: 'normal', label: 'REGULAR', icon: <Bold size={12} className="opacity-35" /> },
@@ -2069,7 +2243,7 @@ export default function App() {
 
                   {/* 颜色 */}
                   <div>
-                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">COLOR</span>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">{t.color}</span>
                     <div className="grid grid-cols-6 gap-1">
                       {['#111111', '#FF3333', '#2F80ED', '#1B8A5A', '#C88B00', '#FFFFFF'].map(color => (
                         <button
@@ -2093,7 +2267,7 @@ export default function App() {
                   {/* 字号 Slider */}
                   <div>
                     <div className="flex justify-between mb-1">
-                      <span className="text-[9px] font-mono uppercase opacity-40">SIZE</span>
+                      <span className="text-[9px] font-mono uppercase opacity-40">{t.size}</span>
                       <span className="text-[9px] font-mono">{selectedBlock.fontSize || 12}px</span>
                     </div>
                     <input
@@ -2106,7 +2280,7 @@ export default function App() {
 
                   {/* 对齐 */}
                   <div>
-                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">ALIGNMENT</span>
+                    <span className="text-[9px] font-mono uppercase opacity-40 block mb-1">{t.alignment}</span>
                     <div className="grid grid-cols-3 gap-1">
                       {[
                         { value: 'left', icon: '⬅' },
@@ -2130,10 +2304,11 @@ export default function App() {
                 </div>
               )}
 
+              {isSelectedTextBlock && (
               <div className="space-y-3 pt-4 border-t border-black/5">
-                <h3 className="section-label">Content / Metadata</h3>
+                <h3 className="section-label">{t.content}</h3>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-[#666]">Block Label</span>
+                  <span className="text-[10px] uppercase font-bold text-[#666]">{t.blockLabel}</span>
                   <input 
                     type="text" 
                     value={selectedBlock.label} 
@@ -2143,7 +2318,7 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-[#666]">Hyperlink</span>
+                  <span className="text-[10px] uppercase font-bold text-[#666]">{t.hyperlink}</span>
                   <div className="flex items-center gap-2 mt-1">
                     <Link size={14} className="text-swiss-black/35" />
                     <input
@@ -2157,37 +2332,11 @@ export default function App() {
                   </div>
                 </div>
               </div>
+              )}
 
-              <div className="space-y-4 pt-4 border-t border-black/5">
-                <h3 className="section-label">Typography / Kern</h3>
-                <div className="space-y-1">
-                  {(selectedBlock.type === 'text' || selectedBlock.type === 'heading') && (
-                    <PrecisionSlider 
-                      label="Font_Size [PT]" 
-                      min={6}
-                      max={120}
-                      value={selectedBlock.fontSize || 12} 
-                      onChange={(v) => updateBlock(selectedBlock.id, { fontSize: v })}
-                    />
-                  )}
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#666]">Tracking</span>
-                    <div className="control-dial">
-                      <div className="control-knob left-[40%]" />
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#666]">Leading</span>
-                    <div className="control-dial">
-                      <div className="control-knob left-[70%]" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {selectedBlock.imageUrl && (
+              {isSelectedImageBlock && selectedBlock.imageUrl && (
                 <div className="space-y-4 pt-4 border-t border-black/5">
-                  <h3 className="section-label">Image Transformation</h3>
+                  <h3 className="section-label">{t.imageTransform}</h3>
                   <button 
                     onClick={() => {
                       const input = document.createElement('input');
@@ -2202,11 +2351,11 @@ export default function App() {
                     className="w-full py-2 bg-white border border-black/10 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-swiss-grey-light transition-colors"
                   >
                     <Upload size={14} />
-                    Replace Image
+                    {t.replaceImage}
                   </button>
                   <div className="space-y-2">
                     <div className="inspector-row !border-none">
-                      <span className="text-[10px] uppercase font-bold text-[#666]">Fit Mode</span>
+                      <span className="text-[10px] uppercase font-bold text-[#666]">{t.fitMode}</span>
                       <div className="flex gap-1">
                         <button 
                           onClick={() => updateBlock(selectedBlock.id, { imageFit: 'cover' }, true)}
@@ -2251,30 +2400,6 @@ export default function App() {
                 </div>
               )}
 
-              <div className="pt-6 space-y-3">
-                <button 
-                  onClick={exportSVG}
-                  className="w-full py-3 bg-white text-swiss-black text-[11px] font-bold uppercase tracking-widest hover:bg-swiss-red hover:text-white transition-all border border-swiss-black/10 hover:border-swiss-red"
-                >
-                  Export SVG
-                </button>
-                <button 
-                  onClick={() => alert('SPEC EXPORT SEQUENCE INITIATED... [MOCK]')}
-                  className="w-full py-3 bg-[#111] text-white text-[11px] font-bold uppercase tracking-widest hover:bg-swiss-black transition-all border border-transparent hover:border-white/20"
-                >
-                  Export PDF Spec
-                </button>
-                <button 
-                  onClick={() => {
-                    rememberBlocks();
-                    setBlocks(prev => settleBlocks(prev.filter(b => !selectedIds.includes(b.id))));
-                    selectOnly(null);
-                  }}
-                  className="w-full py-2 bg-transparent text-swiss-black/40 text-[9px] font-mono font-bold uppercase tracking-[0.2em] hover:bg-swiss-red/5 hover:text-swiss-red transition-all border border-swiss-black/5 hover:border-swiss-red/20"
-                >
-                  DELETE
-                </button>
-              </div>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full opacity-10 space-y-2 grayscale">
@@ -2282,6 +2407,23 @@ export default function App() {
               <span className="text-[10px] font-mono font-bold">NULL.DATA</span>
             </div>
           )}
+        </div>
+        <div className="mt-4 -mx-6 -mb-6 p-4 bg-swiss-black/5 border-t border-swiss-black/10">
+          <h3 className="section-label">{t.export}</h3>
+          <div className="grid grid-cols-1 gap-2">
+            <button 
+              onClick={exportSVG}
+              className="w-full py-3 bg-white text-swiss-black text-[11px] font-bold uppercase tracking-widest hover:bg-swiss-red hover:text-white transition-all border border-swiss-black/10 hover:border-swiss-red"
+            >
+              {t.exportSvg}
+            </button>
+            <button 
+              onClick={() => alert(language === 'zh' ? 'PDF 规格导出功能准备中...' : 'PDF spec export is coming soon...')}
+              className="w-full py-3 bg-[#111] text-white text-[11px] font-bold uppercase tracking-widest hover:bg-swiss-black transition-all border border-transparent hover:border-white/20"
+            >
+              {t.exportPdf}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -2406,6 +2548,7 @@ function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBl
         className={`w-full bg-transparent border-none resize-none outline-none text-left leading-snug placeholder:opacity-20 scrollbar-hide ${
           overflowMode === 'autoHeight' ? 'min-h-[44px] overflow-visible' : 'h-full'
         } ${overflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'}`}
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         onFocus={() => {
           if (block.label === '点击编辑文字' || block.label === 'TEXT BLOCK') {
