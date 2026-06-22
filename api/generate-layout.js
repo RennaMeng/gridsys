@@ -51,6 +51,15 @@ const selectTemplate = (analysis, templates, selectedTemplateId) => {
   )) || templates[0];
 };
 
+const parseDataUrl = (dataUrl = '') => {
+  const match = String(dataUrl).match(/^data:([^;,]+);base64,(.+)$/);
+  if (!match) return null;
+  return {
+    mimeType: match[1],
+    data: match[2]
+  };
+};
+
 const normalizeSlotAssignments = (raw, template) => {
   const validSlotIds = new Set((template.elements || []).map(element => element.slotId));
   const assignments = Array.isArray(raw.slotAssignments) ? raw.slotAssignments : [];
@@ -197,8 +206,10 @@ export default async function handler(req, res) {
     const {
       prompt = '',
       selectedTemplateId = 'auto',
+      referenceEnabled = false,
       textAssets = [],
       imageAssets = [],
+      referenceImages = [],
       contentJSON = {}
     } = body;
 
@@ -253,6 +264,7 @@ Slot assignment rules:
 - Optional slots may be hidden with visible false when they do not help the narrative.
 - Discover pages explain why the problem or opportunity exists.
 - For Discover templates, charts, statistics, diagrams, and collage references are represented as image slots when matching image slots exist. Prefer filling image-heavy slots with uploaded imageAssets before hiding them.
+- If referenceEnabled is true and reference layout images are provided, study their visual rhythm, image/text balance, density, hierarchy, and approximate composition. Use the selected template slots as the implementation boundary, but choose visible slots and asset order to resemble the reference layout more than the default template.
 - Develop pages explain how the prototype works.
 - Deliver pages present the final outcome, validation feedback, usage scenarios, and component system.
 - Preserve narrative hierarchy from the template.
@@ -272,13 +284,38 @@ Slot assignment rules:
       })),
       textAssets,
       imageAssets,
+      referenceEnabled,
+      referenceImages: referenceEnabled
+        ? referenceImages.map(image => ({
+          id: image.id,
+          name: image.name,
+          width: image.width,
+          height: image.height
+        }))
+        : [],
       contentJSON
     };
+
+    const referenceParts = referenceEnabled
+      ? referenceImages
+        .map(image => {
+          const parsed = parseDataUrl(image.dataUrl);
+          return parsed
+            ? {
+              inlineData: {
+                mimeType: parsed.mimeType,
+                data: parsed.data
+              }
+            }
+            : null;
+        })
+        .filter(Boolean)
+      : [];
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: [{ text: JSON.stringify(userContent) }],
+      contents: [{ role: 'user', parts: [{ text: JSON.stringify(userContent) }, ...referenceParts] }],
       config: {
         systemInstruction,
         temperature: 0.55,

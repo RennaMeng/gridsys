@@ -23,7 +23,6 @@ import {
   FileText,
   Workflow,
   Zap,
-  Target,
   Upload,
   AlignLeft,
   AlignCenter,
@@ -31,6 +30,7 @@ import {
   Fullscreen,
   Scaling,
   Undo2,
+  Redo2,
   Link,
   MousePointer2,
   HelpCircle,
@@ -184,6 +184,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [history, setHistory] = useState<LayoutBlock[][]>([]);
+  const [future, setFuture] = useState<LayoutBlock[][]>([]);
   const blocksRef = useRef<LayoutBlock[]>(INITIAL_BLOCKS);
   const [showGrid, setShowGrid] = useState(true);
   const [zoom, setZoom] = useState(0.85);
@@ -213,10 +214,12 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<TemplateJSON[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>('auto');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>(STAGE_TEMPLATE_MAP.discover);
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
   const [pageStage, setPageStage] = useState<PageStage>('discover');
+  const [referenceEnabled, setReferenceEnabled] = useState(false);
+  const [textAssetsEnabled, setTextAssetsEnabled] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     pageType: false,
     assets: false,
@@ -277,16 +280,32 @@ export default function App() {
   const rememberBlocks = () => {
     const snapshot = blocksRef.current.map(block => ({ ...block }));
     setHistory(prev => [...prev.slice(-29), snapshot]);
+    setFuture([]);
   };
 
   const undo = () => {
     setHistory(prev => {
       const previous = prev[prev.length - 1];
       if (!previous) return prev;
+      const current = blocksRef.current.map(block => ({ ...block }));
+      setFuture(next => [current, ...next.slice(0, 29)]);
       setBlocks(previous);
       setSelectedId(null);
       setSelectedIds([]);
       return prev.slice(0, -1);
+    });
+  };
+
+  const redo = () => {
+    setFuture(prev => {
+      const next = prev[0];
+      if (!next) return prev;
+      const current = blocksRef.current.map(block => ({ ...block }));
+      setHistory(historyPrev => [...historyPrev.slice(-29), current]);
+      setBlocks(next);
+      setSelectedId(null);
+      setSelectedIds([]);
+      return prev.slice(1);
     });
   };
 
@@ -612,6 +631,18 @@ export default function App() {
         return;
       }
 
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && e.shiftKey) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         undo();
@@ -810,7 +841,7 @@ export default function App() {
 
   const handleImageAssetUpload = (files: FileList | File[], forcedRole?: ImageAssetRole) => {
     const nextFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    nextFiles.slice(0, Math.max(0, 10 - imageAssets.length)).forEach(file => {
+    nextFiles.slice(0, Math.max(0, 24 - imageAssets.length)).forEach(file => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const dataUrl = event.target?.result as string;
@@ -850,14 +881,16 @@ export default function App() {
   };
 
   const buildContentJSON = (userMessage: string, detectedStage: string): ContentJSON => {
-    const titleAsset = textAssets.find(asset => asset.role === 'title');
-    const subtitleAsset = textAssets.find(asset => asset.role === 'subtitle');
-    const bodyAssets = textAssets.filter(asset => asset.role === 'body');
-    const captionAsset = textAssets.find(asset => asset.role === 'caption');
-    const labelAsset = textAssets.find(asset => asset.role === 'label');
-    const heroImage = imageAssets.find(asset => asset.role === 'hero') || imageAssets[0];
-    const supportImages = imageAssets.filter(asset => asset.id !== heroImage?.id);
-    const combinedText = [userMessage, ...textAssets.map(asset => asset.content)].join('\n');
+    const enabledTextAssets = textAssetsEnabled ? textAssets : [];
+    const layoutImages = imageAssets.filter(asset => asset.role !== 'reference');
+    const titleAsset = enabledTextAssets.find(asset => asset.role === 'title');
+    const subtitleAsset = enabledTextAssets.find(asset => asset.role === 'subtitle');
+    const bodyAssets = enabledTextAssets.filter(asset => asset.role === 'body');
+    const captionAsset = enabledTextAssets.find(asset => asset.role === 'caption');
+    const labelAsset = enabledTextAssets.find(asset => asset.role === 'label');
+    const heroImage = layoutImages.find(asset => asset.role === 'hero') || layoutImages[0];
+    const supportImages = layoutImages.filter(asset => asset.id !== heroImage?.id);
+    const combinedText = [userMessage, ...enabledTextAssets.map(asset => asset.content)].join('\n');
     const statistic = combinedText.match(/\b\d+(?:\.\d+)?%|\b\d+(?:,\d{3})*(?:\.\d+)?\b/)?.[0];
 
     return {
@@ -933,6 +966,10 @@ export default function App() {
 
       const analysis = analyzeProjectContent(userMessage);
       const contentJSON = buildContentJSON(userMessage, analysis.detectedStage);
+      const layoutImageAssets = imageAssets.filter(asset => asset.role !== 'reference');
+      const referenceImageAssets = referenceEnabled
+        ? imageAssets.filter(asset => asset.role === 'reference')
+        : [];
       const response = await fetch('/api/generate-layout', {
         method: 'POST',
         headers: {
@@ -941,18 +978,27 @@ export default function App() {
         body: JSON.stringify({
           prompt: userMessage,
           selectedTemplateId,
+          referenceEnabled,
           contentJSON,
-          textAssets: textAssets.map(asset => ({
+          textAssets: (textAssetsEnabled ? textAssets : []).map(asset => ({
             id: asset.id,
             role: asset.role,
             content: asset.content
           })),
-          imageAssets: imageAssets.map(asset => ({
+          imageAssets: layoutImageAssets.map(asset => ({
             id: asset.id,
             name: asset.name,
             role: asset.role,
             width: asset.width,
             height: asset.height
+          })),
+          referenceImages: referenceImageAssets.map(asset => ({
+            id: asset.id,
+            name: asset.name,
+            role: asset.role,
+            width: asset.width,
+            height: asset.height,
+            dataUrl: asset.dataUrl
           }))
         })
       });
@@ -967,15 +1013,13 @@ export default function App() {
       const template = availableTemplates.find(item => item.templateMeta.templateId === result.selectedTemplate);
 
       rememberBlocks();
-      setCanvasPresetId('digital-16-9');
-      setCanvasOrientation('landscape');
       setLayoutMode('editorial');
       setLastRenderJSON(renderJSON);
       setBlocks(newBlocks);
       selectOnly(null);
       setChatMessages(prev => [...prev, {
         role: 'ai',
-        text: `AI 已根据提示词调整 Render JSON。模板参考：${template?.templateMeta.templateName || result.selectedTemplate}。${result.reasoning || ''}`
+        text: `AI 已生成 Render JSON。模板参考：${template?.templateMeta.templateName || result.selectedTemplate}。${result.reasoning || ''}`
       }]);
     } catch (err: any) {
       setChatMessages(prev => [...prev, { role: 'ai', text: `生成失败: ${err.message}` }]);
@@ -988,13 +1032,13 @@ export default function App() {
     <div className="flex h-screen w-screen bg-swiss-grey-base text-swiss-black overflow-hidden select-none">
       {/* Top Bar */}
       <nav className="fixed top-0 left-0 right-0 h-[52px] bg-[#111] border-b border-[#333] text-white flex items-center justify-between px-6 z-50">
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-5 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-black text-base tracking-widest uppercase">Grid.sys</span>
             <span className="bg-swiss-red text-white px-1.5 py-0.5 rounded-[2px] text-[10px] font-bold">V2.4</span>
           </div>
           
-          <div className="flex items-center gap-8 text-[11px] font-bold uppercase tracking-wider text-white/70">
+          <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider text-white/70">
             <button
               onClick={undo}
               disabled={history.length === 0}
@@ -1004,72 +1048,85 @@ export default function App() {
               <Undo2 size={13} strokeWidth={3} />
               UNDO
             </button>
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => handleZoom(-0.05)}
-                className="hover:text-swiss-red transition-colors"
-              >
-                <Minus size={12} strokeWidth={4} />
-              </button>
-              <span className="font-mono tabular-nums min-w-[32px]">
-                {Math.round(zoom * 100)}% SCALE
-              </span>
-              <button 
-                onClick={() => handleZoom(0.05)}
-                className="hover:text-swiss-red transition-colors"
-              >
-                <Plus size={12} strokeWidth={4} />
-              </button>
-              <button
-                onClick={fitCanvasToViewport}
-                className="px-2 py-1 border border-white/15 text-white/60 hover:text-white hover:border-swiss-red transition-colors"
-                title="Fit canvas to screen"
-              >
-                FIT
-              </button>
+            <button
+              onClick={redo}
+              disabled={future.length === 0}
+              className="flex items-center gap-1 hover:text-swiss-red disabled:opacity-25 disabled:hover:text-white/70 transition-colors"
+              title="重做下一步"
+            >
+              <Redo2 size={13} strokeWidth={3} />
+              REDO
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-white/70">
+            <span className="hidden xl:inline">VIEWPORT: {canvasViewportLabel}</span>
+            <div className="flex border border-white/15 bg-white/5">
+              {CANVAS_PRESETS.map(preset => (
+                <button
+                  key={preset.id}
+                  onClick={() => selectCanvasPreset(preset)}
+                  className={`px-2.5 py-1 text-[10px] font-black font-mono transition-colors ${
+                    canvasPresetId === preset.id
+                      ? 'bg-swiss-red text-white'
+                      : 'text-white/55 hover:text-white hover:bg-white/10'
+                  }`}
+                  title={`${preset.viewportLabel} ${preset.width}x${preset.height}px`}
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <span>VIEWPORT: {canvasViewportLabel}</span>
-              <div className="flex border border-white/15 bg-white/5">
-                {CANVAS_PRESETS.map(preset => (
-                  <button
-                    key={preset.id}
-                    onClick={() => selectCanvasPreset(preset)}
-                    className={`px-2.5 py-1 text-[10px] font-black font-mono transition-colors ${
-                      canvasPresetId === preset.id
-                        ? 'bg-swiss-red text-white'
-                        : 'text-white/55 hover:text-white hover:bg-white/10'
-                    }`}
-                    title={`${preset.viewportLabel} ${preset.width}x${preset.height}px`}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex border border-white/15 bg-white/5">
-                {[
-                  { value: 'landscape' as const, label: 'H' },
-                  { value: 'portrait' as const, label: 'V' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => setCanvasOrientation(option.value)}
-                    className={`px-2 py-1 text-[10px] font-black font-mono transition-colors ${
-                      canvasOrientation === option.value
-                        ? 'bg-swiss-red text-white'
-                        : 'text-white/55 hover:text-white hover:bg-white/10'
-                    }`}
-                    title={option.value === 'landscape' ? '横放' : '竖放'}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+            <div className="flex border border-white/15 bg-white/5">
+              {[
+                { value: 'landscape' as const, label: 'H' },
+                { value: 'portrait' as const, label: 'V' },
+              ].map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setCanvasOrientation(option.value)}
+                  className={`px-2 py-1 text-[10px] font-black font-mono transition-colors ${
+                    canvasOrientation === option.value
+                      ? 'bg-swiss-red text-white'
+                      : 'text-white/55 hover:text-white hover:bg-white/10'
+                  }`}
+                  title={option.value === 'landscape' ? '横放' : '竖放'}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-8 text-[11px] font-bold uppercase tracking-wider text-white/50">
+        <div className="flex items-center gap-6 text-[11px] font-bold uppercase tracking-wider text-white/50">
+          <div className="flex items-center gap-3 text-white/70">
+            <button 
+              onClick={() => handleZoom(-0.05)}
+              className="hover:text-swiss-red transition-colors"
+              title="缩小"
+            >
+              <Minus size={12} strokeWidth={4} />
+            </button>
+            <span className="font-mono tabular-nums min-w-[68px] text-center">
+              {Math.round(zoom * 100)}% SCALE
+            </span>
+            <button 
+              onClick={() => handleZoom(0.05)}
+              className="hover:text-swiss-red transition-colors"
+              title="放大"
+            >
+              <Plus size={12} strokeWidth={4} />
+            </button>
+            <button
+              onClick={fitCanvasToViewport}
+              className="px-2 py-1 border border-white/15 text-white/60 hover:text-white hover:border-swiss-red transition-colors"
+              title="Fit canvas to screen"
+            >
+              FIT
+            </button>
+          </div>
+
           <div className="flex items-center gap-3">
             <span>Grid Visibility</span>
             <div 
@@ -1090,8 +1147,8 @@ export default function App() {
             <HelpCircle size={14} />
             GUIDE
           </button>
-          
-          <div className="hidden lg:block text-[10px] opacity-60">
+
+          <div className="hidden 2xl:block text-[10px] opacity-60">
             UNSAVED CHANGES • FILE: HCI_PORTFOLIO_DRAFT
           </div>
         </div>
@@ -1170,6 +1227,58 @@ export default function App() {
                     </option>
                   ))}
                 </select>
+                <div className="mt-3 border-t border-swiss-black/10 pt-3">
+                  <button
+                    onClick={() => setReferenceEnabled(prev => !prev)}
+                    className="w-full flex items-center justify-between text-left"
+                  >
+                    <span>
+                      <span className="block text-[9px] font-black uppercase tracking-widest text-swiss-black/55">Use Reference Layout</span>
+                      <span className="block mt-1 text-[9px] leading-tight text-swiss-black/35">
+                        开启后上传排版参考，AI 会优先参考图片和文字的排布。
+                      </span>
+                    </span>
+                    <span className={`relative block w-9 h-4.5 border transition-colors ${
+                      referenceEnabled ? 'bg-swiss-red border-swiss-red' : 'bg-white border-swiss-black/20'
+                    }`}>
+                      <span className={`absolute top-[2px] w-3 h-3 bg-swiss-black transition-all ${
+                        referenceEnabled ? 'left-[20px] bg-white' : 'left-[2px]'
+                      }`} />
+                    </span>
+                  </button>
+                  {referenceEnabled && (
+                    <div className="mt-3">
+                      <button
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.multiple = true;
+                          input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || [], 'reference');
+                          input.click();
+                        }}
+                        className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
+                      >
+                        <Upload size={13} />
+                        Add Reference Images
+                      </button>
+                      <div className="grid grid-cols-3 gap-2 mt-3">
+                        {imageAssets.filter(asset => asset.role === 'reference').map(asset => (
+                          <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
+                            <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
+                            <button
+                              onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                              className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              title="Remove reference"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CollapsibleSection>
 
               <CollapsibleSection
@@ -1177,7 +1286,7 @@ export default function App() {
                 icon={<ImageIcon size={13} />}
                 collapsed={collapsedSections.assets}
                 onToggle={() => toggleSection('assets')}
-                meta={`${imageAssets.filter(asset => asset.role !== 'reference').length} IMG / ${textAssets.length} TXT`}
+                meta={`${imageAssets.filter(asset => asset.role !== 'reference').length} IMG${textAssetsEnabled ? ` / ${textAssets.length} TXT` : ''}`}
               >
                 <button
                   onClick={() => {
@@ -1215,85 +1324,118 @@ export default function App() {
                         <option value="hero">hero</option>
                         <option value="support">support</option>
                         <option value="texture">texture</option>
-                        <option value="reference">ref</option>
                       </select>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-4">
-                  <div className="grid grid-cols-5 gap-1 mb-2">
-                    {(['title', 'subtitle', 'body', 'caption', 'label'] as TextAssetRole[]).map(role => (
-                      <button
-                        key={role}
-                        onClick={() => setNewTextRole(role)}
-                        className={`h-7 text-[8px] font-black uppercase border transition-colors ${
-                          newTextRole === role
-                            ? 'bg-swiss-black text-white border-swiss-black'
-                            : 'bg-white/50 border-swiss-black/10 text-swiss-black/45 hover:text-swiss-red hover:border-swiss-red'
-                        }`}
-                      >
-                        {role}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    value={newTextAsset}
-                    onChange={(event) => setNewTextAsset(event.target.value)}
-                    placeholder="粘贴标题、正文、说明文字..."
-                    className="w-full h-20 resize-none bg-white/70 border border-swiss-black/10 p-2 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-swiss-black/25"
-                  />
+                <div className="mt-4 border-t border-swiss-black/10 pt-3">
                   <button
-                    onClick={addTextAsset}
-                    disabled={!newTextAsset.trim()}
-                    className="mt-2 w-full h-8 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
+                    onClick={() => setTextAssetsEnabled(prev => !prev)}
+                    className="w-full flex items-center justify-between text-left"
                   >
-                    Add Text
+                    <span>
+                      <span className="block text-[9px] font-black uppercase tracking-widest text-swiss-black/55">Use Text Assets</span>
+                      <span className="block mt-1 text-[9px] leading-tight text-swiss-black/35">
+                        开启后可以上传标题、正文和说明文字。
+                      </span>
+                    </span>
+                    <span className={`relative block w-9 h-4.5 border transition-colors ${
+                      textAssetsEnabled ? 'bg-swiss-red border-swiss-red' : 'bg-white border-swiss-black/20'
+                    }`}>
+                      <span className={`absolute top-[2px] w-3 h-3 bg-swiss-black transition-all ${
+                        textAssetsEnabled ? 'left-[20px] bg-white' : 'left-[2px]'
+                      }`} />
+                    </span>
                   </button>
-                  <div className="mt-3 space-y-2">
-                    {textAssets.map(asset => (
-                      <div key={asset.id} className="group border border-swiss-black/10 bg-white/60 p-2">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[8px] font-black uppercase tracking-widest text-swiss-red">{asset.role}</span>
+                  {textAssetsEnabled && (
+                    <div className="mt-3">
+                      <div className="grid grid-cols-5 gap-1 mb-2">
+                        {(['title', 'subtitle', 'body', 'caption', 'label'] as TextAssetRole[]).map(role => (
                           <button
-                            onClick={() => setTextAssets(prev => prev.filter(item => item.id !== asset.id))}
-                            className="text-swiss-black/25 hover:text-swiss-red"
-                            title="Remove text"
+                            key={role}
+                            onClick={() => setNewTextRole(role)}
+                            className={`h-7 text-[8px] font-black uppercase border transition-colors ${
+                              newTextRole === role
+                                ? 'bg-swiss-black text-white border-swiss-black'
+                                : 'bg-white/50 border-swiss-black/10 text-swiss-black/45 hover:text-swiss-red hover:border-swiss-red'
+                            }`}
                           >
-                            <X size={12} />
+                            {role}
                           </button>
-                        </div>
-                        <p className="text-[10px] leading-snug text-swiss-black/70 line-clamp-3 whitespace-pre-wrap">{asset.content}</p>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                      <textarea
+                        value={newTextAsset}
+                        onChange={(event) => setNewTextAsset(event.target.value)}
+                        placeholder="粘贴标题、正文、说明文字..."
+                        className="w-full h-20 resize-none bg-white/70 border border-swiss-black/10 p-2 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-swiss-black/25"
+                      />
+                      <button
+                        onClick={addTextAsset}
+                        disabled={!newTextAsset.trim()}
+                        className="mt-2 w-full h-8 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
+                      >
+                        Add Text
+                      </button>
+                      <div className="mt-3 space-y-2">
+                        {textAssets.map(asset => (
+                          <div key={asset.id} className="group border border-swiss-black/10 bg-white/60 p-2">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[8px] font-black uppercase tracking-widest text-swiss-red">{asset.role}</span>
+                              <button
+                                onClick={() => setTextAssets(prev => prev.filter(item => item.id !== asset.id))}
+                                className="text-swiss-black/25 hover:text-swiss-red"
+                                title="Remove text"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                            <p className="text-[10px] leading-snug text-swiss-black/70 line-clamp-3 whitespace-pre-wrap">{asset.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CollapsibleSection>
 
               <CollapsibleSection
-                title="3. AI Prompt"
+                title={lastRenderJSON ? "3. AI Edit" : "3. Generate"}
                 icon={<Zap size={13} />}
                 collapsed={collapsedSections.ai}
                 onToggle={() => toggleSection('ai')}
-                meta={aiLoading ? 'GENERATING' : 'READY'}
+                meta={aiLoading ? 'GENERATING' : lastRenderJSON ? 'PROMPT ON' : 'NO PROMPT'}
               >
-                <textarea
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && chatInput.trim() && !aiLoading) {
-                      callGeminiLayout(chatInput.trim());
-                    }
-                  }}
-                  placeholder="描述页面目标，例如：为 final outcome 页面生成一个右侧大图、左侧用户反馈和底部组件展示的排版..."
-                  className="w-full h-24 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
-                />
+                {lastRenderJSON ? (
+                  <textarea
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && chatInput.trim() && !aiLoading) {
+                        callGeminiLayout(chatInput.trim());
+                      }
+                    }}
+                    placeholder="描述希望 AI 修改的方向，例如：让图片更密集、减少文字、突出右侧主视觉..."
+                    className="w-full h-24 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
+                  />
+                ) : (
+                  <div className="border border-swiss-black/10 bg-white/60 p-3">
+                    <p className="text-[10px] leading-snug text-swiss-black/55">
+                      第一次生成不需要输入提示词。选择页面类型，上传图片，需要时开启文字或参考图，然后直接生成排版。
+                    </p>
+                  </div>
+                )}
                 <button
-                  onClick={() => chatInput.trim() && !aiLoading && callGeminiLayout(chatInput.trim())}
-                  disabled={aiLoading || !chatInput.trim()}
+                  onClick={() => {
+                    const defaultPrompt = `根据当前选择的 ${pageStage} 页面类型，使用已上传图片${textAssetsEnabled ? '和文字素材' : ''}${referenceEnabled ? '，并参考已上传的排版参考图' : ''}，生成一版作品集排版。`;
+                    const message = lastRenderJSON ? chatInput.trim() : defaultPrompt;
+                    if (message && !aiLoading) callGeminiLayout(message);
+                  }}
+                  disabled={aiLoading || (Boolean(lastRenderJSON) && !chatInput.trim())}
                   className="mt-2 w-full h-9 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
                 >
-                  Generate with AI
+                  {lastRenderJSON ? 'Update with AI' : 'Generate Layout'}
                 </button>
                 {lastRenderJSON && (
                   <div className="mt-2 border border-swiss-black/10 bg-white/60 p-2">
@@ -1318,43 +1460,6 @@ export default function App() {
                         {msg.role === 'user' ? 'Prompt' : 'AI'}
                       </span>
                       {msg.text}
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleSection>
-
-              <CollapsibleSection
-                title="4. Reference"
-                icon={<Target size={13} />}
-                collapsed={collapsedSections.reference}
-                onToggle={() => toggleSection('reference')}
-                meta={`${imageAssets.filter(asset => asset.role === 'reference').length} REF`}
-              >
-                <button
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.multiple = true;
-                    input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || [], 'reference');
-                    input.click();
-                  }}
-                  className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
-                >
-                  <Upload size={13} />
-                  Add Reference Images
-                </button>
-                <div className="grid grid-cols-3 gap-2 mt-3">
-                  {imageAssets.filter(asset => asset.role === 'reference').map(asset => (
-                    <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
-                      <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
-                      <button
-                        onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
-                        className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                        title="Remove reference"
-                      >
-                        <X size={12} />
-                      </button>
                     </div>
                   ))}
                 </div>
@@ -1677,61 +1782,6 @@ export default function App() {
 
       {/* Sidebar Right: Inspector */}
       <aside className="fixed right-0 top-[52px] bottom-0 w-[260px] glass-panel z-40 p-6 flex flex-col overflow-hidden">
-        <div className="mb-6 pb-5 border-b border-swiss-black/10">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="section-label !mb-0">Canvas Size</h2>
-            <span className="font-mono text-[9px] font-bold text-swiss-red">
-              {canvasSize.width}x{canvasSize.height}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-1">
-            {CANVAS_PRESETS.map(preset => (
-              <button
-                key={preset.id}
-                onClick={() => selectCanvasPreset(preset)}
-                className={`px-2 py-2 border text-[10px] font-black font-mono uppercase transition-all ${
-                  canvasPresetId === preset.id
-                    ? 'bg-swiss-red text-white border-swiss-red'
-                    : 'bg-white text-swiss-black border-swiss-black/10 hover:border-swiss-red hover:text-swiss-red'
-                }`}
-                title={`${preset.viewportLabel} ${preset.width}x${preset.height}px`}
-              >
-                <span className="block">{preset.label}</span>
-                <span className={`block mt-1 text-[8px] font-medium ${
-                  canvasPresetId === preset.id ? 'text-white/70' : 'text-swiss-black/35'
-                }`}>
-                  {preset.width}x{preset.height}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-1 mt-2">
-            {[
-              { value: 'landscape' as const, label: '横放', icon: 'H' },
-              { value: 'portrait' as const, label: '竖放', icon: 'V' },
-            ].map(option => (
-              <button
-                key={option.value}
-                onClick={() => setCanvasOrientation(option.value)}
-                className={`px-2 py-2 border text-[10px] font-black uppercase transition-all ${
-                  canvasOrientation === option.value
-                    ? 'bg-swiss-black text-white border-swiss-black'
-                    : 'bg-white text-swiss-black border-swiss-black/10 hover:border-swiss-red hover:text-swiss-red'
-                }`}
-              >
-                <span className="font-mono mr-1">{option.icon}</span>
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={fitCanvasToViewport}
-            className="mt-2 w-full py-2 bg-white border border-swiss-black/10 text-[10px] font-black font-mono uppercase tracking-widest hover:bg-swiss-red hover:text-white hover:border-swiss-red transition-all"
-          >
-            Fit To View
-          </button>
-        </div>
-
         <div className="mb-6">
           <h2 className="section-label">Parametric Inspector</h2>
           {selectedBlock ? (
@@ -2271,8 +2321,8 @@ export default function App() {
               </div>
               <div className="grid grid-cols-3 gap-3 mt-5">
                 {[
-                  { icon: <Upload size={18} />, title: '素材', body: '在左侧 AI Generate 中选择页面类型，再上传图片、文字和参考图。' },
-                  { icon: <Zap size={18} />, title: '生成', body: '输入页面目标，AI 会选择对应模板并生成中间画布内容。' },
+                  { icon: <Upload size={18} />, title: '素材', body: '在左侧选择页面类型并上传图片，需要时开启文字素材或参考排版。' },
+                  { icon: <Zap size={18} />, title: '生成', body: '第一次不需要写提示词，直接生成；生成后可用 AI Prompt 继续整理版面。' },
                   { icon: <Settings2 size={18} />, title: '精修', body: '选中画布元素后，用右侧面板调整尺寸、图像和文字细节。' },
                 ].map(item => (
                   <div key={item.title} className="border border-swiss-black/10 p-4 bg-swiss-grey-base/40">
