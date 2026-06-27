@@ -49,7 +49,7 @@ import { ContentJSON, RenderJSON, TemplateJSON } from './utils/templateTypes';
 const COLUMNS = 24;
 const ROWS = 16; 
 const MARGIN = 48;
-const GUTTER = 12;
+const GUTTER = 0;
 
 type CanvasPresetId = 'digital-16-9' | 'strip-1800-768' | 'a3' | 'a4';
 type CanvasOrientation = 'landscape' | 'portrait';
@@ -2733,9 +2733,6 @@ function GridView({
           <div key={i} className="w-full h-full relative group">
             <div className="absolute inset-0 border border-swiss-red/10 bg-swiss-red/[0.02]" />
             <div className="absolute top-0 left-0 right-0 h-[1px] bg-swiss-red/5" />
-            <div className="absolute bottom-1 right-1">
-               <span className="text-[6px] font-mono text-swiss-red/20">{Math.floor(i / COLUMNS) + 1}</span>
-            </div>
           </div>
         ))}
       </div>
