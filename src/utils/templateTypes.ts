@@ -150,6 +150,7 @@ export type RenderElement = {
   label?: string;
   zIndex?: number;
   textRules?: TextRules;
+  sourceSlotId?: string;
 };
 
 export type RenderJSON = {

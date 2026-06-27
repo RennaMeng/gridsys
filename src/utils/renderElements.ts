@@ -77,7 +77,8 @@ export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] 
       padding: isText ? (textRules?.padding ?? 8) : undefined,
       lineClamp: isText ? fittedText?.lineClamp : undefined,
       zIndex: element.zIndex || index + 1,
-      generatedByAI: true
+      generatedByAI: true,
+      sourceSlotId: element.sourceSlotId || element.id
     };
   });
 }
