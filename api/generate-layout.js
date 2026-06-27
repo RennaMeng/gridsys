@@ -473,7 +473,13 @@ const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, 
         element.value = fitTextToRule(assignment?.value || assignment?.content || fallbackContentForSlot(templateElement.slotId, contentJSON), templateElement.textRules);
         element.label = fitTextToRule(assignment?.label || 'Key statistic', templateElement.textRules);
       } else if (templateElement.type !== 'divider') {
-        element.content = fitTextToRule(assignment?.content || fallbackContentForSlot(templateElement.slotId, contentJSON) || templateElement.role, templateElement.textRules);
+        element.content = fitTextToRule(
+          assignment?.content ||
+          fallbackContentForSlot(templateElement.slotId, contentJSON) ||
+          templateElement.contentSummary ||
+          templateElement.role,
+          templateElement.textRules
+        );
       }
 
       return element;
