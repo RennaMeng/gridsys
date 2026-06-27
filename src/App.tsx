@@ -102,6 +102,19 @@ const IMAGE_ROLE_OPTIONS: Array<{ label: string; value: Exclude<ImageAssetRole, 
   { label: 'PERSON', value: 'portrait_image' },
   { label: 'PRODUCT', value: 'product_image' }
 ];
+const ASSET_VISUAL_TYPE_OPTIONS: Array<{ label: string; value: AssetVisualType }> = [
+  { label: 'PORTRAIT', value: 'portrait' },
+  { label: 'CHART', value: 'chart' },
+  { label: 'DIAGRAM', value: 'diagram' },
+  { label: 'PRODUCT', value: 'product_photo' },
+  { label: 'FIELD', value: 'field_photo' },
+  { label: 'SCREEN', value: 'screenshot' }
+];
+const ASSET_DENSITY_OPTIONS: Array<{ label: string; value: AssetInformationDensity }> = [
+  { label: 'HIGH', value: 'high' },
+  { label: 'MED', value: 'medium' },
+  { label: 'LOW', value: 'low' }
+];
 const VISUAL_TYPE_ROLE_MAP: Record<AssetVisualType, Exclude<ImageAssetRole, 'reference'>> = {
   portrait: 'portrait_image',
   chart: 'data_visualization',
@@ -448,6 +461,7 @@ export default function App() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>(getDefaultTemplateForStage('discover', 'digital-16-9'));
   const [uploadedReferenceTemplate, setUploadedReferenceTemplate] = useState<TemplateJSON | null>(null);
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
+  const [assetAnalysisPendingIds, setAssetAnalysisPendingIds] = useState<string[]>([]);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
   const [pageStage, setPageStage] = useState<PageStage>('discover');
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>('template');
@@ -1093,6 +1107,8 @@ export default function App() {
   const analyzeImageAssetsWithAI = async (assets: ImageAsset[]) => {
     const analyzableAssets = assets.filter(asset => asset.role !== 'reference');
     if (!analyzableAssets.length) return;
+    const analyzingIds = analyzableAssets.map(asset => asset.id);
+    setAssetAnalysisPendingIds(prev => Array.from(new Set([...prev, ...analyzingIds])));
 
     try {
       const previewAssets = await Promise.all(analyzableAssets.map(async asset => ({
@@ -1149,6 +1165,8 @@ export default function App() {
           ? `图片理解暂时不可用，已使用本地初始标签继续：${err.message}`
           : `Image understanding is unavailable for now. Local asset profiles will be used: ${err.message}`
       }]);
+    } finally {
+      setAssetAnalysisPendingIds(prev => prev.filter(id => !analyzingIds.includes(id)));
     }
   };
 
@@ -1199,6 +1217,30 @@ export default function App() {
           text: language === 'zh' ? `图片读取失败：${err.message}` : `Image upload failed: ${err.message}`
         }]);
       });
+  };
+
+  const updateAssetProfile = (assetId: string, updates: Partial<AssetProfile>) => {
+    setImageAssets(prev => prev.map(asset => {
+      if (asset.id !== assetId) return asset;
+      const currentProfile = asset.assetProfile || inferLocalAssetProfile(asset.name, asset.width, asset.height, asset.role === 'reference' ? 'supporting_image' : asset.role);
+      const visualType = updates.visualType || currentProfile.visualType;
+      const recommendedRole = updates.recommendedRole || (
+        updates.visualType ? VISUAL_TYPE_ROLE_MAP[visualType] : currentProfile.recommendedRole
+      );
+      const nextProfile: AssetProfile = {
+        ...currentProfile,
+        ...updates,
+        visualType,
+        recommendedRole,
+        source: 'ai'
+      };
+
+      return {
+        ...asset,
+        role: asset.role === 'reference' ? asset.role : recommendedRole,
+        assetProfile: nextProfile
+      };
+    }));
   };
 
   const addTextAsset = () => {
@@ -1804,33 +1846,93 @@ export default function App() {
                   <Upload size={13} />
                   {t.uploadImages}
                 </button>
-                <div className="grid grid-cols-3 gap-2 mt-3">
-                  {imageAssets.filter(asset => asset.role !== 'reference').map(asset => (
-                    <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
-                      <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
-                      <button
-                        onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
-                        className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                        title={language === 'zh' ? '移除图片' : 'Remove image'}
-                      >
-                        <X size={12} />
-                      </button>
-                      <select
-                        value={asset.role}
-                        onChange={(event) => setImageAssets(prev => prev.map(item => (
-                          item.id === asset.id ? { ...item, role: event.target.value as ImageAssetRole } : item
-                        )))}
-                        className="absolute left-1 bottom-1 max-w-[calc(100%-8px)] bg-white/90 border border-swiss-black/15 text-[8px] font-black uppercase outline-none"
-                        title="Image role"
-                      >
-                        {IMAGE_ROLE_OPTIONS.map(option => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                <div className="mt-3 space-y-2">
+                  {imageAssets.filter(asset => asset.role !== 'reference').map(asset => {
+                    const profile = asset.assetProfile || inferLocalAssetProfile(asset.name, asset.width, asset.height, asset.role === 'reference' ? 'supporting_image' : asset.role);
+                    const isAnalyzing = assetAnalysisPendingIds.includes(asset.id);
+                    const confidence = profile.confidence === undefined ? null : Math.round(profile.confidence * 100);
+
+                    return (
+                      <div key={asset.id} className="group border border-swiss-black/10 bg-white/70 p-2">
+                        <div className="flex gap-2">
+                          <div className="relative shrink-0">
+                            <img src={asset.dataUrl} alt={asset.name} className="h-16 w-16 object-cover border border-swiss-black/10" />
+                            <button
+                              onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                              className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              title={language === 'zh' ? '移除图片' : 'Remove image'}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-[9px] font-black uppercase tracking-widest text-swiss-black/65">{asset.name}</p>
+                                <p className="mt-0.5 text-[8px] font-bold uppercase tracking-widest text-swiss-black/35">
+                                  {isAnalyzing
+                                    ? (language === 'zh' ? 'AI 理解中' : 'AI reading')
+                                    : `${profile.source === 'ai' ? 'AI' : 'LOCAL'}${confidence === null ? '' : ` ${confidence}%`}`}
+                                </p>
+                              </div>
+                              <span className={`shrink-0 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest ${
+                                profile.informationDensity === 'high'
+                                  ? 'bg-swiss-red text-white'
+                                  : 'bg-swiss-black/5 text-swiss-black/45'
+                              }`}>
+                                {profile.informationDensity}
+                              </span>
+                            </div>
+
+                            <div className="mt-2 grid grid-cols-3 gap-1">
+                              <select
+                                value={profile.visualType}
+                                onChange={(event) => updateAssetProfile(asset.id, { visualType: event.target.value as AssetVisualType })}
+                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
+                                title={language === 'zh' ? 'AI 判断的图片类型' : 'AI visual type'}
+                              >
+                                {ASSET_VISUAL_TYPE_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={profile.informationDensity}
+                                onChange={(event) => updateAssetProfile(asset.id, { informationDensity: event.target.value as AssetInformationDensity })}
+                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
+                                title={language === 'zh' ? '信息密度' : 'Information density'}
+                              >
+                                {ASSET_DENSITY_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={profile.recommendedRole}
+                                onChange={(event) => updateAssetProfile(asset.id, { recommendedRole: event.target.value as Exclude<ImageAssetRole, 'reference'> })}
+                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
+                                title={language === 'zh' ? '推荐角色' : 'Recommended role'}
+                              >
+                                {IMAGE_ROLE_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {profile.reasoning && (
+                              <p className="mt-1 line-clamp-2 text-[8px] leading-snug text-swiss-black/35">
+                                {profile.reasoning}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-4 border-t border-swiss-black/10 pt-3">
