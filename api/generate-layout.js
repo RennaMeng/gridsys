@@ -3,6 +3,8 @@ import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 
 const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9', 'deliver_final_outcome_16x9'];
+const REFERENCE_GRID_WIDTH = 24;
+const REFERENCE_GRID_HEIGHT = 16;
 
 const loadTemplate = async (templateId) => {
   const filePath = path.join(process.cwd(), 'public', 'templates', `${templateId}.json`);
@@ -79,6 +81,31 @@ const normalizeSlotAssignments = (raw, template) => {
 const fallbackContentForSlot = (slotId, contentJSON) => {
   const content = contentJSON?.content || {};
   const fallbackMap = {
+    inspiration_title: content.page_title || 'Research Background',
+    inspiration_subtitle: content.section_heading || content.context_text || '',
+    inspiration_body_summary: content.background_summary || content.context_text || '',
+    documentary_caption_left: content.evidence_caption || content.image_caption || '',
+    documentary_caption_right: content.evidence_caption || content.image_caption || '',
+    user_identification_title: content.user_identification_title || 'User Identification',
+    age_0_6_note: content.early_user_note || content.target_group || '',
+    age_6_15_note: content.core_user_note || content.target_group || '',
+    age_above_15_note: content.late_user_note || content.target_group || '',
+    user_identification_conclusion: content.target_group || content.background_summary || '',
+    manifestations_title: content.manifestations_title || 'Manifestations & Pain Points',
+    manifestations_body_summary: content.manifestations_body_summary || content.background_summary || '',
+    symptom_blurred_vision: content.key_statistic || content.symptom_blurred_vision || '',
+    symptom_word_overlap: content.symptom_word_overlap || content.key_statistic || '',
+    symptom_difficulty_spelling: content.symptom_difficulty_spelling || content.key_statistic || '',
+    symptom_letter_confusion: content.symptom_letter_confusion || content.key_statistic || '',
+    manifestations_summary: content.manifestations_summary || content.research_question || '',
+    negative_effect_title: content.negative_effect_title || 'Negative Effect',
+    findings_title: content.findings_title || 'Findings',
+    finding_multi_sensory_title: content.finding_multi_sensory_title || 'Finding 01',
+    finding_multi_sensory_summary: content.finding_multi_sensory_summary || content.evidence_caption || '',
+    finding_customized_guidance_title: content.finding_customized_guidance_title || 'Finding 02',
+    finding_customized_guidance_summary: content.finding_customized_guidance_summary || content.evidence_caption || '',
+    finding_systematic_teaching_title: content.finding_systematic_teaching_title || 'Finding 03',
+    finding_systematic_teaching_summary: content.finding_systematic_teaching_summary || content.evidence_caption || '',
     page_title: content.page_title || 'Portfolio Page',
     background_summary: content.background_summary || content.context_text || '',
     section_heading: content.section_heading || 'Evidence Mapping',
@@ -101,6 +128,19 @@ const fallbackContentForSlot = (slotId, contentJSON) => {
 const fallbackAssetForSlot = (slotId, contentJSON, imageAssets) => {
   const content = contentJSON?.content || {};
   const fallbackMap = {
+    documentary_image_left: imageAssets[0]?.id,
+    documentary_image_right: imageAssets[1]?.id || imageAssets[0]?.id,
+    age_0_6_child_image: imageAssets[2]?.id || imageAssets[0]?.id,
+    age_0_6_curve_diagram: imageAssets[3]?.id || imageAssets[1]?.id || imageAssets[0]?.id,
+    age_6_15_child_image: imageAssets[4]?.id || imageAssets[2]?.id || imageAssets[0]?.id,
+    age_6_15_curve_diagram: imageAssets[5]?.id || imageAssets[3]?.id || imageAssets[1]?.id,
+    age_above_15_child_image: imageAssets[6]?.id || imageAssets[4]?.id || imageAssets[0]?.id,
+    age_above_15_curve_diagram: imageAssets[7]?.id || imageAssets[5]?.id || imageAssets[1]?.id,
+    manifestations_child_image: imageAssets[8]?.id || imageAssets[0]?.id,
+    brain_illustration: imageAssets[9]?.id || imageAssets[2]?.id || imageAssets[0]?.id,
+    negative_effect_emotional_group: imageAssets[10]?.id || imageAssets[3]?.id || imageAssets[0]?.id,
+    negative_effect_neurological_group: imageAssets[11]?.id || imageAssets[4]?.id || imageAssets[1]?.id,
+    negative_effect_support_group: imageAssets[12]?.id || imageAssets[5]?.id || imageAssets[2]?.id,
     context_visual: content.context_visual,
     category_collage_image: content.category_collage_image || imageAssets[0]?.id,
     category_summary_image: content.category_summary_image || imageAssets[1]?.id || imageAssets[0]?.id,
@@ -158,15 +198,15 @@ const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
   const elements = Array.isArray(source.elements) ? source.elements : [];
 
   const normalized = elements
-    .slice(0, 28)
+    .slice(0, 48)
     .map((element, index) => {
       const type = ['image', 'text', 'caption', 'annotation', 'shape', 'divider', 'chart'].includes(element.type)
         ? element.type
         : (element.src || element.assetId ? 'image' : 'text');
-      const x = clampNumber(element.x, 0, 11, index % 12);
-      const y = clampNumber(element.y, 0, 7, Math.floor(index / 4));
-      const w = clampNumber(element.w, 1, 12 - x, type === 'image' ? 3 : 2);
-      const h = clampNumber(element.h, 1, 8 - y, type === 'image' ? 2 : 1);
+      const x = clampNumber(element.x, 0, REFERENCE_GRID_WIDTH - 1, index % REFERENCE_GRID_WIDTH);
+      const y = clampNumber(element.y, 0, REFERENCE_GRID_HEIGHT - 1, Math.floor(index / 6));
+      const w = clampNumber(element.w, 1, REFERENCE_GRID_WIDTH - x, type === 'image' ? 6 : 4);
+      const h = clampNumber(element.h, 1, REFERENCE_GRID_HEIGHT - y, type === 'image' ? 4 : 2);
       const id = String(element.id || `reference_${type}_${index + 1}`);
       const base = {
         type,
@@ -207,7 +247,7 @@ const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
 
   return {
     templateId: 'uploaded_reference_layout',
-    canvas: { width: 12, height: 8 },
+    canvas: { width: REFERENCE_GRID_WIDTH, height: REFERENCE_GRID_HEIGHT },
     elements: normalized.length ? normalized : [
       {
         type: 'image',
@@ -215,8 +255,8 @@ const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
         src: fallbackImage,
         x: 0,
         y: 0,
-        w: 8,
-        h: 5,
+        w: 16,
+        h: 10,
         crop: 'cover',
         zIndex: 1
       },
@@ -225,9 +265,9 @@ const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
         id: 'reference_text_1',
         content: content.page_title || 'Portfolio Layout',
         x: 0,
-        y: 5,
-        w: 5,
-        h: 1,
+        y: 10,
+        w: 10,
+        h: 2,
         style: 'title',
         zIndex: 2,
         textRules: { maxChars: 64, fontSize: 24, lineClamp: 2, overflow: 'clip', padding: 8 }
@@ -235,6 +275,174 @@ const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
     ].filter(element => element.type !== 'image' || element.src)
   };
 };
+
+const normalizeReferenceTemplate = (raw) => {
+  const source = raw.referenceTemplate || raw.template || raw;
+  const rawElements = Array.isArray(source.elements) ? source.elements : [];
+  const elements = rawElements
+    .slice(0, 48)
+    .map((element, index) => {
+      const type = ['image', 'text', 'caption', 'annotation', 'shape', 'divider', 'chart'].includes(element.type)
+        ? element.type
+        : 'text';
+      const x = clampNumber(element.x, 0, REFERENCE_GRID_WIDTH - 1, index % REFERENCE_GRID_WIDTH);
+      const y = clampNumber(element.y, 0, REFERENCE_GRID_HEIGHT - 1, Math.floor(index / 6));
+      const w = clampNumber(element.w, 1, REFERENCE_GRID_WIDTH - x, type === 'image' ? 6 : 4);
+      const h = clampNumber(element.h, 1, REFERENCE_GRID_HEIGHT - y, type === 'image' ? 4 : 2);
+      const role = String(element.role || (type === 'image' ? 'reference_image_slot' : 'reference_text_slot'));
+      const slotId = String(element.slotId || element.id || `reference_${type}_${index + 1}`)
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .toLowerCase();
+
+      return {
+        slotId,
+        type,
+        role,
+        x,
+        y,
+        w,
+        h,
+        style: element.style || (type === 'image' ? 'image' : index === 0 ? 'title' : 'body'),
+        ...(type === 'image' ? { crop: element.crop === 'contain' ? 'contain' : 'cover' } : {}),
+        zIndex: clampNumber(element.zIndex, 1, 999, index + 1),
+        required: element.required === true || index < 3,
+        ...(type !== 'image' && type !== 'divider' ? {
+          textRules: {
+            maxChars: clampNumber(element.textRules?.maxChars, 24, 180, element.style === 'title' ? 64 : 110),
+            fontSize: clampNumber(element.textRules?.fontSize, 8, 48, element.style === 'title' ? 24 : 12),
+            lineClamp: clampNumber(element.textRules?.lineClamp, 1, 8, element.style === 'title' ? 2 : 4),
+            overflow: 'clip',
+            padding: clampNumber(element.textRules?.padding, 0, 24, 8)
+          }
+        } : {}),
+        contentSummary: String(element.contentSummary || element.role || role)
+      };
+    });
+
+  const safeElements = elements.length ? elements : [
+    {
+      slotId: 'reference_hero_image',
+      type: 'image',
+      role: 'hero_image',
+      x: 0,
+      y: 0,
+      w: 16,
+      h: 10,
+      style: 'image',
+      crop: 'cover',
+      zIndex: 1,
+      required: true,
+      contentSummary: 'Largest image region inferred from uploaded reference.'
+    },
+    {
+      slotId: 'reference_title',
+      type: 'text',
+      role: 'title',
+      x: 0,
+      y: 10,
+      w: 10,
+      h: 2,
+      style: 'title',
+      zIndex: 2,
+      required: true,
+      textRules: { maxChars: 64, fontSize: 24, lineClamp: 2, overflow: 'clip', padding: 8 },
+      contentSummary: 'Primary title region inferred from uploaded reference.'
+    }
+  ];
+
+  return {
+    templateMeta: {
+      templateId: 'uploaded_reference_template',
+      templateName: 'Uploaded Reference Template',
+      pageType: 'discover',
+      doubleDiamondStage: 'discover',
+      layoutPurpose: 'uploaded_reference_layout_structure',
+      narrativeRole: 'preserve_uploaded_reference_composition_for_asset_assignment',
+      suitableFor: ['uploaded reference', 'custom layout structure', 'AI asset assignment']
+    },
+    canvas: {
+      ratio: '16:9',
+      orientation: 'landscape',
+      backgroundColor: source.canvas?.backgroundColor || '#F8F6EC'
+    },
+    grid: {
+      type: 'uploaded_reference_grid',
+      columns: REFERENCE_GRID_WIDTH,
+      rows: REFERENCE_GRID_HEIGHT,
+      columnGap: 10,
+      rowGap: 10,
+      margin: 48,
+      layoutDensity: source.grid?.layoutDensity || source.analysis?.density || 'medium',
+      alignment: 'reference_based',
+      coordinateSystem: '24x16_grid'
+    },
+    layoutRules: source.layoutRules || {
+      density: source.analysis?.density || 'medium',
+      alignToGrid: true,
+      avoidOverlap: false,
+      preserveSectionIntegrity: true,
+      minTextPadding: 8,
+      sectionGap: 12,
+      preferredReadingOrder: 'left_to_right_top_to_bottom'
+    },
+    designSystem: source.designSystem || {
+      summary: 'Inferred from uploaded reference image.'
+    },
+    sections: Array.isArray(source.sections) ? source.sections : [],
+    groups: Array.isArray(source.groups) ? source.groups : [],
+    elements: safeElements,
+    contentRequirements: {
+      required: safeElements.filter(element => element.required).map(element => element.slotId),
+      optional: safeElements.filter(element => !element.required).map(element => element.slotId)
+    },
+    slots: {
+      textSlots: safeElements
+        .filter(element => element.type !== 'image' && element.type !== 'divider')
+        .map(element => ({ id: element.slotId, role: element.role, required: element.required })),
+      imageSlots: safeElements
+        .filter(element => element.type === 'image')
+        .map(element => ({ id: element.slotId, role: element.role, required: element.required, cropStyle: element.crop || 'cover' }))
+    },
+    styleRules: {
+      visualDensity: source.analysis?.density || 'medium',
+      layoutStyle: 'uploaded_reference_structure',
+      preserveReferenceComposition: true
+    },
+    aiGenerationRules: {
+      mainLogic: 'assign_user_assets_to_uploaded_reference_template',
+      prioritizeUploadedImages: true,
+      preserveTemplateGeometry: true,
+      avoid: ['changing coordinates during assignment', 'inventing external image URLs']
+    },
+    layoutVariants: [
+      {
+        variantId: 'uploaded_reference_template',
+        layoutLogic: 'reference_image_to_fixed_slot_template'
+      }
+    ]
+  };
+};
+
+const buildTemplatePreviewRenderJSON = (template) => ({
+  templateId: template.templateMeta.templateId,
+  canvas: {
+    width: template.grid.columns,
+    height: template.grid.rows
+  },
+  elements: (template.elements || []).map((element, index) => ({
+    type: element.type,
+    id: element.slotId,
+    x: element.x,
+    y: element.y,
+    w: element.w,
+    h: element.h,
+    style: element.style,
+    crop: element.crop,
+    zIndex: element.zIndex || index + 1,
+    content: element.type === 'image' ? undefined : element.contentSummary || element.role,
+    textRules: element.textRules
+  }))
+});
 
 const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, imageAssets) => {
   const assignmentMap = new Map(slotAssignments.map(assignment => [assignment.slotId, assignment]));
@@ -299,6 +507,8 @@ export default async function handler(req, res) {
       prompt = '',
       selectedTemplateId = 'auto',
       referenceMode = 'template',
+      action = 'generate-layout',
+      customTemplate = null,
       textAssets = [],
       imageAssets = [],
       referenceImages = [],
@@ -307,14 +517,21 @@ export default async function handler(req, res) {
 
     const templates = await Promise.all(TEMPLATE_IDS.map(loadTemplate));
     const analysis = analyzeProjectContent(prompt, textAssets);
-    const useUploadedReference = referenceMode === 'upload' && referenceImages.length > 0;
-    const selectedTemplate = selectTemplate(analysis, templates, selectedTemplateId);
+    const hasCustomTemplate = customTemplate && Array.isArray(customTemplate.elements);
+    const useUploadedReference = referenceMode === 'upload' && referenceImages.length > 0 && !hasCustomTemplate;
+    const selectedTemplate = hasCustomTemplate
+      ? customTemplate
+      : selectTemplate(analysis, templates, selectedTemplateId);
     const selectedTemplateSummary = {
       templateMeta: selectedTemplate.templateMeta,
       canvas: selectedTemplate.canvas,
       grid: selectedTemplate.grid,
       contentRequirements: selectedTemplate.contentRequirements,
       slots: selectedTemplate.slots,
+      layoutRules: selectedTemplate.layoutRules,
+      designSystem: selectedTemplate.designSystem,
+      sections: selectedTemplate.sections,
+      groups: selectedTemplate.groups,
       elements: selectedTemplate.elements,
       styleRules: selectedTemplate.styleRules,
       aiGenerationRules: selectedTemplate.aiGenerationRules,
@@ -323,7 +540,7 @@ export default async function handler(req, res) {
 
     const templateSystemInstruction = `You are an AI content-to-layout-slot mapper for a web-based design portfolio generator.
 
-The selected Template JSON owns all layout geometry. The frontend/server will read selectedTemplate.elements to get 12x8 grid x, y, w, h, type, style, crop, and zIndex.
+The selected Template JSON owns all layout geometry. The frontend/server will read selectedTemplate.elements to get grid x, y, w, h, type, style, crop, and zIndex. Discover templates use an upgraded 24x16 grid with sections, groups, layoutRules, designSystem, and contentSummary fields.
 Your job is only to decide which supplied content or asset should fill each slot.
 
 Critical output rule:
@@ -356,13 +573,75 @@ Slot assignment rules:
 - Required slots must be included and visible.
 - Optional slots may be hidden with visible false when they do not help the narrative.
 - Discover pages explain why the problem or opportunity exists.
-- For Discover templates, charts, statistics, diagrams, and collage references are represented as image slots when matching image slots exist. Prefer filling image-heavy slots with uploaded imageAssets before hiding them.
+- For Discover templates, follow selectedTemplate.sections and selectedTemplate.groups to preserve the large section logic before individual slot fitting.
+- For Discover templates, charts, statistics, diagrams, grouped visual-text cards, and collage references are represented as image slots when matching image slots exist. Prefer filling image-heavy slots with uploaded imageAssets before hiding them.
+- For Discover templates, never use old project-specific facts or topic language unless the user explicitly supplied that topic.
 - Develop pages explain how the prototype works.
 - Deliver pages present the final outcome, validation feedback, usage scenarios, and component system.
 - Preserve narrative hierarchy from the template.
 - Shorten or structure long text so it fits naturally. Do not cram paragraphs into small slots.
 - Do not include project-specific facts that were not supplied by the user or assets.
 - Do not include API keys or hidden system details.`;
+
+    const referenceTemplateSystemInstruction = `You are an AI reference-layout-to-template analyzer for a web-based design portfolio generator.
+
+You will receive uploaded reference layout images. Your task is ONLY to convert the visible layout structure into a reusable 24x16 slot template.
+
+Critical rules:
+- Do NOT assign user images or user text yet.
+- Do NOT output final Render JSON.
+- Do NOT use external URLs.
+- Output a reusable template with slot geometry, roles, and textRules.
+- Preserve the reference image's layout rhythm: large regions, small repeated cards, grouped rows, captions, overlap, and hierarchy.
+- Prefer 12-36 useful slots. Avoid tiny decorative fragments unless they affect composition.
+- Return only valid JSON. No markdown.
+
+Required JSON schema:
+{
+  "referenceTemplate": {
+    "templateMeta": {
+      "templateId": "uploaded_reference_template",
+      "templateName": "Uploaded Reference Template",
+      "pageType": "discover",
+      "doubleDiamondStage": "discover",
+      "layoutPurpose": "uploaded_reference_layout_structure",
+      "narrativeRole": "preserve_uploaded_reference_composition_for_asset_assignment",
+      "suitableFor": ["uploaded reference"]
+    },
+    "canvas": { "ratio": "16:9", "orientation": "landscape", "backgroundColor": "#F8F6EC" },
+    "grid": { "columns": 24, "rows": 16, "columnGap": 10, "rowGap": 10, "margin": 48 },
+    "sections": [],
+    "groups": [],
+    "elements": [
+      {
+        "slotId": "unique_slot_id",
+        "type": "image | text | caption | annotation | shape | divider | chart",
+        "role": "semantic slot role",
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 2,
+        "style": "title | heading | body | caption | image",
+        "crop": "cover | contain",
+        "zIndex": 1,
+        "required": true,
+        "contentSummary": "what this slot should contain",
+        "textRules": {
+          "maxChars": 80,
+          "fontSize": 12,
+          "lineClamp": 3,
+          "overflow": "clip",
+          "padding": 8
+        }
+      }
+    ],
+    "analysis": {
+      "layoutSummary": "short summary",
+      "density": "low | medium | high"
+    }
+  },
+  "reasoning": "short Chinese explanation"
+}`;
 
     const referenceSystemInstruction = `You are an AI layout analyzer and JSON generator for a web-based design portfolio tool.
 
@@ -371,7 +650,7 @@ Study the reference image composition first: visual rhythm, hierarchy, image/tex
 
 Important:
 - In this mode, do NOT use selectedTemplate.elements or any template slots.
-- Generate a complete Render JSON directly on a 12x8 grid.
+- Generate a complete Render JSON directly on a 24x16 grid.
 - Use only asset IDs from imageAssets for image elements.
 - Do not invent external URLs.
 - Keep text concise and based only on userPrompt, textAssets, and contentJSON.
@@ -381,7 +660,7 @@ Required JSON schema:
 {
   "renderJSON": {
     "templateId": "uploaded_reference_layout",
-    "canvas": { "width": 12, "height": 8 },
+    "canvas": { "width": 24, "height": 16 },
     "elements": [
       {
         "type": "image | text | caption | annotation | shape | divider",
@@ -453,13 +732,27 @@ Required JSON schema:
       model: 'gemini-3-flash-preview',
       contents: [{ role: 'user', parts: [{ text: JSON.stringify(userContent) }, ...referenceParts] }],
       config: {
-        systemInstruction: useUploadedReference ? referenceSystemInstruction : templateSystemInstruction,
-        temperature: useUploadedReference ? 0.45 : 0.55,
+        systemInstruction: action === 'generate-reference-template'
+          ? referenceTemplateSystemInstruction
+          : useUploadedReference
+            ? referenceSystemInstruction
+            : templateSystemInstruction,
+        temperature: action === 'generate-reference-template' ? 0.35 : useUploadedReference ? 0.45 : 0.55,
         responseMimeType: 'application/json'
       }
     });
 
     const parsed = JSON.parse((response.text || '{}').replace(/```json|```/g, '').trim());
+    if (action === 'generate-reference-template') {
+      const referenceTemplate = normalizeReferenceTemplate(parsed);
+      return res.status(200).json({
+        referenceTemplate,
+        renderJSON: buildTemplatePreviewRenderJSON(referenceTemplate),
+        selectedTemplate: referenceTemplate.templateMeta.templateId,
+        reasoning: parsed.reasoning || '已根据上传参考图生成临时模板。'
+      });
+    }
+
     const slotAssignments = useUploadedReference ? [] : normalizeSlotAssignments(parsed, selectedTemplate);
     const renderJSON = useUploadedReference
       ? normalizeReferenceRenderJSON(parsed, imageAssets, contentJSON)

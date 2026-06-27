@@ -46,8 +46,8 @@ import { renderJSONToLayoutBlocks } from './utils/renderElements';
 import { ContentJSON, RenderJSON, TemplateJSON } from './utils/templateTypes';
 
 // Constants
-const COLUMNS = 12;
-const ROWS = 8; 
+const COLUMNS = 24;
+const ROWS = 16; 
 const MARGIN = 48;
 const GUTTER = 12;
 
@@ -353,11 +353,13 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<TemplateJSON[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>(STAGE_TEMPLATE_MAP.discover);
+  const [uploadedReferenceTemplate, setUploadedReferenceTemplate] = useState<TemplateJSON | null>(null);
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
   const [pageStage, setPageStage] = useState<PageStage>('discover');
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>('template');
   const [textAssetsEnabled, setTextAssetsEnabled] = useState(false);
+  const [referenceTemplateLoading, setReferenceTemplateLoading] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     pageType: false,
     assets: false,
@@ -1044,6 +1046,31 @@ export default function App() {
         section_heading: labelAsset?.content || 'Evidence Mapping',
         evidence_caption: captionAsset?.content || bodyAssets[1]?.content || userMessage,
         research_question: textAssets.find(asset => asset.content.toLowerCase().includes('how might we'))?.content || 'How might we frame the opportunity?',
+        inspiration_title: titleAsset?.content || userMessage.split('\n')[0] || 'Research Background',
+        inspiration_subtitle: subtitleAsset?.content || labelAsset?.content || 'Context and research origin',
+        inspiration_body_summary: bodyAssets[0]?.content || userMessage,
+        documentary_caption_left: captionAsset?.content || bodyAssets[1]?.content,
+        documentary_caption_right: bodyAssets[2]?.content || captionAsset?.content,
+        user_identification_title: 'User Identification',
+        early_user_note: bodyAssets[1]?.content || bodyAssets[0]?.content,
+        core_user_note: bodyAssets[2]?.content || bodyAssets[0]?.content,
+        late_user_note: bodyAssets[3]?.content || bodyAssets[0]?.content,
+        target_group: labelAsset?.content || subtitleAsset?.content || bodyAssets[0]?.content,
+        manifestations_title: 'Manifestations & Pain Points',
+        manifestations_body_summary: bodyAssets[1]?.content || bodyAssets[0]?.content,
+        symptom_blurred_vision: statistic,
+        symptom_word_overlap: statistic,
+        symptom_difficulty_spelling: statistic,
+        symptom_letter_confusion: statistic,
+        manifestations_summary: bodyAssets[2]?.content || userMessage,
+        negative_effect_title: 'Negative Effect',
+        findings_title: 'Findings',
+        finding_multi_sensory_title: labelAsset?.content || 'Finding 01',
+        finding_multi_sensory_summary: bodyAssets[1]?.content || userMessage,
+        finding_customized_guidance_title: 'Finding 02',
+        finding_customized_guidance_summary: bodyAssets[2]?.content || bodyAssets[0]?.content,
+        finding_systematic_teaching_title: 'Finding 03',
+        finding_systematic_teaching_summary: bodyAssets[3]?.content || bodyAssets[0]?.content,
         context_text: subtitleAsset?.content || bodyAssets[0]?.content || userMessage,
         function_text: bodyAssets[0]?.content || userMessage,
         usage_text: bodyAssets[1]?.content || captionAsset?.content || userMessage,
@@ -1062,6 +1089,19 @@ export default function App() {
         case_image_b: supportImages[8]?.id || supportImages[1]?.id || heroImage?.id,
         case_image_c: supportImages[9]?.id || supportImages[2]?.id || heroImage?.id,
         case_image_d: supportImages[10]?.id || supportImages[3]?.id || heroImage?.id,
+        documentary_image_left: supportImages[0]?.id || heroImage?.id,
+        documentary_image_right: supportImages[1]?.id || heroImage?.id,
+        age_0_6_child_image: supportImages[2]?.id || heroImage?.id,
+        age_0_6_curve_diagram: supportImages[3]?.id || supportImages[0]?.id || heroImage?.id,
+        age_6_15_child_image: supportImages[4]?.id || supportImages[1]?.id || heroImage?.id,
+        age_6_15_curve_diagram: supportImages[5]?.id || supportImages[2]?.id || heroImage?.id,
+        age_above_15_child_image: supportImages[6]?.id || supportImages[3]?.id || heroImage?.id,
+        age_above_15_curve_diagram: supportImages[7]?.id || supportImages[4]?.id || heroImage?.id,
+        manifestations_child_image: heroImage?.id,
+        brain_illustration: supportImages[8]?.id || supportImages[0]?.id || heroImage?.id,
+        negative_effect_emotional_group: supportImages[9]?.id || supportImages[1]?.id || heroImage?.id,
+        negative_effect_neurological_group: supportImages[10]?.id || supportImages[2]?.id || heroImage?.id,
+        negative_effect_support_group: supportImages[11]?.id || supportImages[3]?.id || heroImage?.id,
         hero_usage_image: heroImage?.id,
         main_usage_image: heroImage?.id,
         secondary_usage_image: supportImages[0]?.id,
@@ -1095,6 +1135,63 @@ export default function App() {
     })
   });
 
+  const generateUploadedReferenceTemplate = async () => {
+    const referenceImageAssets = imageAssets.filter(asset => asset.role === 'reference');
+    if (!referenceImageAssets.length) {
+      setChatMessages(prev => [...prev, {
+        role: 'ai',
+        text: language === 'zh' ? '请先上传参考图。' : 'Please upload a reference image first.'
+      }]);
+      return;
+    }
+
+    setReferenceTemplateLoading(true);
+    try {
+      const response = await fetch('/api/generate-layout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'generate-reference-template',
+          prompt: language === 'zh'
+            ? '只分析参考图的版式结构，生成可复用模板。'
+            : 'Analyze only the reference layout structure and generate a reusable template.',
+          referenceMode: 'upload',
+          referenceImages: referenceImageAssets.map(asset => ({
+            id: asset.id,
+            name: asset.name,
+            role: asset.role,
+            width: asset.width,
+            height: asset.height,
+            dataUrl: asset.dataUrl
+          }))
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || '参考模板生成失败。');
+      }
+
+      rememberBlocks();
+      setUploadedReferenceTemplate(result.referenceTemplate);
+      setLastRenderJSON(result.renderJSON);
+      setBlocks(renderJSONToLayoutBlocks(result.renderJSON));
+      selectOnly(null);
+      setChatMessages(prev => [...prev, {
+        role: 'ai',
+        text: language === 'zh'
+          ? `参考模板已生成：${result.referenceTemplate?.elements?.length || 0} 个槽位。下一步可以生成排版，让 AI 分配图片和文本。`
+          : `Reference template generated with ${result.referenceTemplate?.elements?.length || 0} slots. Next, generate the layout to assign images and text.`
+      }]);
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, { role: 'ai', text: `参考模板生成失败: ${err.message}` }]);
+    } finally {
+      setReferenceTemplateLoading(false);
+    }
+  };
+
   const callGeminiLayout = async (userMessage: string) => {
     setAiLoading(true);
     setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
@@ -1112,6 +1209,9 @@ export default function App() {
       const referenceImageAssets = useOwnReference
         ? imageAssets.filter(asset => asset.role === 'reference')
         : [];
+      if (useOwnReference && !uploadedReferenceTemplate) {
+        throw new Error(language === 'zh' ? '请先生成参考模板，再生成排版。' : 'Generate the reference template before generating the layout.');
+      }
       const response = await fetch('/api/generate-layout', {
         method: 'POST',
         headers: {
@@ -1121,6 +1221,7 @@ export default function App() {
           prompt: userMessage,
           selectedTemplateId,
           referenceMode,
+          customTemplate: useOwnReference ? uploadedReferenceTemplate : undefined,
           contentJSON,
           textAssets: (textAssetsEnabled ? textAssets : []).map(asset => ({
             id: asset.id,
@@ -1416,7 +1517,10 @@ export default function App() {
                         input.type = 'file';
                         input.accept = 'image/*';
                         input.multiple = true;
-                        input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || [], 'reference');
+                        input.onchange = (event) => {
+                          setUploadedReferenceTemplate(null);
+                          handleImageAssetUpload((event.target as HTMLInputElement).files || [], 'reference');
+                        };
                         input.click();
                       }}
                       className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
@@ -1429,7 +1533,10 @@ export default function App() {
                         <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
                           <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
                           <button
-                            onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                            onClick={() => {
+                              setUploadedReferenceTemplate(null);
+                              setImageAssets(prev => prev.filter(item => item.id !== asset.id));
+                            }}
                             className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                             title={language === 'zh' ? '移除参考图' : 'Remove reference'}
                           >
@@ -1437,6 +1544,30 @@ export default function App() {
                           </button>
                         </div>
                       ))}
+                    </div>
+                    <button
+                      onClick={generateUploadedReferenceTemplate}
+                      disabled={referenceTemplateLoading || imageAssets.filter(asset => asset.role === 'reference').length === 0}
+                      className="mt-3 w-full h-9 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
+                    >
+                      {referenceTemplateLoading
+                        ? (language === 'zh' ? '正在生成模板...' : 'Generating Template...')
+                        : uploadedReferenceTemplate
+                          ? (language === 'zh' ? '重新生成参考模板' : 'Regenerate Template')
+                          : (language === 'zh' ? '生成参考模板' : 'Generate Reference Template')}
+                    </button>
+                    <div className={`mt-2 border p-2 text-[9px] leading-snug ${
+                      uploadedReferenceTemplate
+                        ? 'border-swiss-red/25 bg-swiss-red/5 text-swiss-black/65'
+                        : 'border-swiss-black/10 bg-white/50 text-swiss-black/35'
+                    }`}>
+                      {uploadedReferenceTemplate
+                        ? (language === 'zh'
+                          ? `模板已准备：${uploadedReferenceTemplate.elements?.length || 0} 个槽位。下一步点击底部生成排版。`
+                          : `Template ready: ${uploadedReferenceTemplate.elements?.length || 0} slots. Next, click Generate Layout below.`)
+                        : (language === 'zh'
+                          ? '先生成参考模板，再让 AI 分配图片和文字。'
+                          : 'Generate the reference template first, then let AI assign images and text.')}
                     </div>
                   </div>
                 )}
@@ -1674,10 +1805,16 @@ export default function App() {
               const defaultPrompt = language === 'zh'
                 ? `根据当前选择的 ${referenceMode === 'template' ? `${pageStage} 模板` : '上传参考图'}，使用已上传图片${textAssetsEnabled ? '和文字素材' : ''}，生成一版作品集排版。`
                 : `Generate a portfolio layout from the current ${referenceMode === 'template' ? `${pageStage} template` : 'uploaded reference image'}, using uploaded images${textAssetsEnabled ? ' and text assets' : ''}.`;
-              const message = lastRenderJSON ? chatInput.trim() : defaultPrompt;
+              const canUseDefaultPrompt = !lastRenderJSON || (referenceMode === 'upload' && Boolean(uploadedReferenceTemplate));
+              const message = canUseDefaultPrompt ? (chatInput.trim() || defaultPrompt) : chatInput.trim();
               if (message && !aiLoading) callGeminiLayout(message);
             }}
-            disabled={aiLoading || (Boolean(lastRenderJSON) && !chatInput.trim())}
+            disabled={
+              aiLoading ||
+              referenceTemplateLoading ||
+              (referenceMode === 'upload' && !uploadedReferenceTemplate) ||
+              (Boolean(lastRenderJSON) && !chatInput.trim() && !(referenceMode === 'upload' && uploadedReferenceTemplate))
+            }
             className="w-full h-11 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
           >
             {lastRenderJSON ? t.updateWithAI : t.generate}

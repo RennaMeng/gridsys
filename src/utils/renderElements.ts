@@ -1,6 +1,9 @@
 import { LayoutBlock } from '../types';
 import { RenderElement, RenderJSON } from './templateTypes';
 
+const EDITOR_COLUMNS = 24;
+const EDITOR_ROWS = 16;
+
 const toGrid = (value: number, total: number, units: number) => Math.round((value / total) * units);
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -14,10 +17,10 @@ const blockType = (element: RenderElement): LayoutBlock['type'] => {
 
 export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] {
   return renderJSON.elements.map((element, index) => {
-    const x = clamp(toGrid(element.x, renderJSON.canvas.width, 12), 0, 11);
-    const y = clamp(toGrid(element.y, renderJSON.canvas.height, 8), 0, 7);
-    const w = clamp(toGrid(element.w, renderJSON.canvas.width, 12), 1, 12 - x);
-    const h = clamp(toGrid(element.h, renderJSON.canvas.height, 8), 1, 8 - y);
+    const x = clamp(toGrid(element.x, renderJSON.canvas.width, EDITOR_COLUMNS), 0, EDITOR_COLUMNS - 1);
+    const y = clamp(toGrid(element.y, renderJSON.canvas.height, EDITOR_ROWS), 0, EDITOR_ROWS - 1);
+    const w = clamp(toGrid(element.w, renderJSON.canvas.width, EDITOR_COLUMNS), 1, EDITOR_COLUMNS - x);
+    const h = clamp(toGrid(element.h, renderJSON.canvas.height, EDITOR_ROWS), 1, EDITOR_ROWS - y);
     const type = blockType(element);
     const isText = type === 'text' || type === 'heading' || type === 'title';
     const textRules = element.textRules;

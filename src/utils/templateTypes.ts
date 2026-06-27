@@ -1,6 +1,6 @@
 import { LayoutBlock } from '../types';
 
-export type TemplateId = 'discover_context_mapping_16x9' | 'develop_prototype_demo_16x9';
+export type TemplateId = 'discover_context_mapping_16x9' | 'develop_prototype_demo_16x9' | 'deliver_final_outcome_16x9';
 
 export type TemplateStage = 'discover' | 'define' | 'develop' | 'deliver';
 
@@ -22,10 +22,11 @@ export type TemplateJSON = {
     rows: number;
     columnGap: number;
     rowGap: number;
+    margin?: number;
     layoutDensity: string;
     alignment: string;
     type: string;
-    coordinateSystem?: '12x8_grid' | string;
+    coordinateSystem?: '12x8_grid' | '24x16_grid' | string;
   };
   elements?: Array<{
     slotId: string;
@@ -56,6 +57,10 @@ export type TemplateJSON = {
   styleRules: Record<string, unknown>;
   aiGenerationRules: Record<string, unknown>;
   layoutVariants: Array<Record<string, unknown> & { variantId: string; layoutLogic: string }>;
+  layoutRules?: Record<string, unknown>;
+  designSystem?: Record<string, unknown>;
+  sections?: Array<Record<string, unknown>>;
+  groups?: Array<Record<string, unknown>>;
 };
 
 export type TextRules = {
