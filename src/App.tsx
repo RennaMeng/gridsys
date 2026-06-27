@@ -60,6 +60,16 @@ type PageStage = 'discover' | 'define' | 'develop' | 'deliver';
 type Language = 'zh' | 'en';
 type ReferenceMode = 'template' | 'upload';
 type ImageAssetRole = 'hero_image' | 'supporting_image' | 'diagram_image' | 'data_visualization' | 'icon_image' | 'background_image' | 'portrait_image' | 'product_image' | 'reference';
+type AssetVisualType = 'portrait' | 'chart' | 'diagram' | 'product_photo' | 'field_photo' | 'screenshot';
+type AssetInformationDensity = 'high' | 'medium' | 'low';
+type AssetProfile = {
+  visualType: AssetVisualType;
+  informationDensity: AssetInformationDensity;
+  recommendedRole: Exclude<ImageAssetRole, 'reference'>;
+  confidence?: number;
+  reasoning?: string;
+  source?: 'local' | 'ai';
+};
 type TextAssetRole = 'title' | 'subtitle' | 'body' | 'caption' | 'label';
 
 type ImageAsset = {
@@ -69,6 +79,7 @@ type ImageAsset = {
   role: ImageAssetRole;
   width?: number;
   height?: number;
+  assetProfile?: AssetProfile;
 };
 
 type TextAsset = {
@@ -91,6 +102,14 @@ const IMAGE_ROLE_OPTIONS: Array<{ label: string; value: Exclude<ImageAssetRole, 
   { label: 'PERSON', value: 'portrait_image' },
   { label: 'PRODUCT', value: 'product_image' }
 ];
+const VISUAL_TYPE_ROLE_MAP: Record<AssetVisualType, Exclude<ImageAssetRole, 'reference'>> = {
+  portrait: 'portrait_image',
+  chart: 'data_visualization',
+  diagram: 'diagram_image',
+  product_photo: 'product_image',
+  field_photo: 'supporting_image',
+  screenshot: 'supporting_image'
+};
 const isInteractiveTarget = (target: EventTarget | null) => (
   target instanceof HTMLInputElement ||
   target instanceof HTMLTextAreaElement ||
@@ -99,6 +118,60 @@ const isInteractiveTarget = (target: EventTarget | null) => (
   target instanceof HTMLAnchorElement ||
   (target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, button, a, [contenteditable="true"]')))
 );
+
+const inferLocalAssetProfile = (
+  fileName: string,
+  width?: number,
+  height?: number,
+  fallbackRole: Exclude<ImageAssetRole, 'reference'> = 'supporting_image'
+): AssetProfile => {
+  const name = fileName.toLowerCase();
+  const aspectRatio = width && height ? width / height : 1;
+  const visualType: AssetVisualType = /chart|graph|data|stat|plot|table|数据|图表/.test(name)
+    ? 'chart'
+    : /diagram|map|flow|wireframe|schema|mapping|地图|流程|结构/.test(name)
+      ? 'diagram'
+      : /portrait|person|user|interview|avatar|人物|访谈|用户/.test(name)
+        ? 'portrait'
+        : /product|prototype|model|mockup|产品|原型|模型/.test(name)
+          ? 'product_photo'
+          : /screen|screenshot|ui|界面|截图/.test(name)
+            ? 'screenshot'
+            : 'field_photo';
+  const informationDensity: AssetInformationDensity = visualType === 'chart' || visualType === 'diagram' || visualType === 'screenshot'
+    ? 'high'
+    : aspectRatio > 1.8 || aspectRatio < 0.65
+      ? 'medium'
+      : 'low';
+
+  return {
+    visualType,
+    informationDensity,
+    recommendedRole: VISUAL_TYPE_ROLE_MAP[visualType] || fallbackRole,
+    confidence: 0.45,
+    reasoning: 'Local filename and aspect-ratio estimate before AI analysis.',
+    source: 'local'
+  };
+};
+
+const createImagePreviewDataUrl = (dataUrl: string, maxSide = 512): Promise<string> => new Promise((resolve) => {
+  const image = new Image();
+  image.onload = () => {
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) {
+      resolve(dataUrl);
+      return;
+    }
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    resolve(canvas.toDataURL('image/jpeg', 0.72));
+  };
+  image.onerror = () => resolve(dataUrl);
+  image.src = dataUrl;
+});
 
 const CANVAS_PRESETS: Array<{
   id: CanvasPresetId;
@@ -1017,30 +1090,115 @@ export default function App() {
     setZoom(prev => Math.min(Math.max(prev + delta, 0.4), 1.5));
   };
 
+  const analyzeImageAssetsWithAI = async (assets: ImageAsset[]) => {
+    const analyzableAssets = assets.filter(asset => asset.role !== 'reference');
+    if (!analyzableAssets.length) return;
+
+    try {
+      const previewAssets = await Promise.all(analyzableAssets.map(async asset => ({
+        id: asset.id,
+        name: asset.name,
+        role: asset.role,
+        width: asset.width,
+        height: asset.height,
+        assetProfile: asset.assetProfile,
+        dataUrl: await createImagePreviewDataUrl(asset.dataUrl)
+      })));
+      const response = await fetch('/api/generate-layout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'analyze-assets',
+          imageAssets: previewAssets
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Asset analysis failed.');
+      }
+      const profileMap = new Map<string, AssetProfile>(
+        (result.assetProfiles || []).map((profile: AssetProfile & { assetId: string }) => [
+          profile.assetId,
+          {
+            visualType: profile.visualType,
+            informationDensity: profile.informationDensity,
+            recommendedRole: profile.recommendedRole,
+            confidence: profile.confidence,
+            reasoning: profile.reasoning,
+            source: 'ai'
+          }
+        ])
+      );
+      setImageAssets(prev => prev.map(asset => {
+        const profile = profileMap.get(asset.id);
+        if (!profile) return asset;
+        return {
+          ...asset,
+          assetProfile: profile,
+          role: asset.role === 'supporting_image' || asset.assetProfile?.source === 'local'
+            ? profile.recommendedRole
+            : asset.role
+        };
+      }));
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, {
+        role: 'ai',
+        text: language === 'zh'
+          ? `图片理解暂时不可用，已使用本地初始标签继续：${err.message}`
+          : `Image understanding is unavailable for now. Local asset profiles will be used: ${err.message}`
+      }]);
+    }
+  };
+
+  const readImageAsset = (
+    file: File,
+    indexInBatch: number,
+    forcedRole?: ImageAssetRole
+  ): Promise<ImageAsset> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const image = new Image();
+      image.onload = () => {
+        const fallbackRole = forcedRole || (imageAssets.length + indexInBatch === 0 ? 'hero_image' : 'supporting_image');
+        const assetProfile = forcedRole === 'reference'
+          ? undefined
+          : inferLocalAssetProfile(file.name, image.naturalWidth, image.naturalHeight, fallbackRole as Exclude<ImageAssetRole, 'reference'>);
+        resolve({
+          id: createLocalId(),
+          name: file.name.replace(/\.[^.]+$/, ''),
+          dataUrl,
+          role: forcedRole || assetProfile?.recommendedRole || fallbackRole,
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+          assetProfile
+        });
+      };
+      image.onerror = () => reject(new Error(`Failed to read image: ${file.name}`));
+      image.src = dataUrl;
+    };
+    reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+
   const handleImageAssetUpload = (files: FileList | File[], forcedRole?: ImageAssetRole) => {
     const nextFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    nextFiles.slice(0, Math.max(0, 24 - imageAssets.length)).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        const image = new Image();
-        image.onload = () => {
-          setImageAssets(prev => [
-            ...prev,
-            {
-              id: createLocalId(),
-              name: file.name.replace(/\.[^.]+$/, ''),
-              dataUrl,
-              role: forcedRole || (prev.length === 0 ? 'hero_image' : 'supporting_image'),
-              width: image.naturalWidth,
-              height: image.naturalHeight
-            }
-          ]);
-        };
-        image.src = dataUrl;
-      };
-      reader.readAsDataURL(file);
-    });
+    const limitedFiles = nextFiles.slice(0, Math.max(0, 24 - imageAssets.length));
+    void Promise.all(limitedFiles.map((file, index) => readImageAsset(file, index, forcedRole)))
+      .then(nextAssets => {
+        setImageAssets(prev => [...prev, ...nextAssets]);
+        if (!forcedRole) {
+          void analyzeImageAssetsWithAI(nextAssets);
+        }
+      })
+      .catch((err: Error) => {
+        setChatMessages(prev => [...prev, {
+          role: 'ai',
+          text: language === 'zh' ? `图片读取失败：${err.message}` : `Image upload failed: ${err.message}`
+        }]);
+      });
   };
 
   const addTextAsset = () => {
@@ -1276,7 +1434,8 @@ export default function App() {
             name: asset.name,
             role: asset.role,
             width: asset.width,
-            height: asset.height
+            height: asset.height,
+            assetProfile: asset.assetProfile
           })),
           referenceImages: referenceImageAssets.map(asset => ({
             id: asset.id,
