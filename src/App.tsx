@@ -275,7 +275,7 @@ const UI_TEXT = {
     useTextAssetsHelp: '开启后可以上传标题、正文和说明文字。',
     addText: '添加文字',
     generate: '生成排版',
-    updateWithAI: '用 AI 修改',
+    updateWithAI: 'AI 生成',
     aiEdit: '3. AI 修改',
     aiEditIntro: '你可以在这里和AI共同修改当前的模版',
     generateInfo: '第一次生成不需要输入提示词。选择参考方式并上传素材后，点击左下方生成排版。',
@@ -339,7 +339,7 @@ const UI_TEXT = {
     useTextAssetsHelp: 'Enable this to upload titles, body copy, and captions.',
     addText: 'Add Text',
     generate: 'Generate Layout',
-    updateWithAI: 'Update with AI',
+    updateWithAI: 'AI Generate',
     aiEdit: '3. AI Edit',
     aiEditIntro: 'You can revise the current template together with AI here.',
     generateInfo: 'No prompt is needed for the first generation. Choose a reference mode, upload assets, then use the bottom generate button.',
@@ -462,6 +462,7 @@ export default function App() {
   const [blocks, setBlocks] = useState<LayoutBlock[]>(INITIAL_BLOCKS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [history, setHistory] = useState<LayoutBlock[][]>([]);
   const [future, setFuture] = useState<LayoutBlock[][]>([]);
   const blocksRef = useRef<LayoutBlock[]>(INITIAL_BLOCKS);
@@ -524,6 +525,7 @@ export default function App() {
     startMouseY: number
     startPositions: Record<string, { x: number, y: number }>
   } | null>(null);
+  const textDragTimerRef = useRef<number | null>(null);
   const resizeRef = useRef<{
     id: string
     startMouseX: number
@@ -601,6 +603,7 @@ export default function App() {
     blocksRef.current = [];
     setSelectedId(null);
     setSelectedIds([]);
+    setEditingTextId(null);
     setHistory([]);
     setFuture([]);
     setLastRenderJSON(null);
@@ -612,6 +615,7 @@ export default function App() {
   const selectOnly = (id: string | null) => {
     setSelectedId(id);
     setSelectedIds(id ? [id] : []);
+    setEditingTextId(prev => (prev && prev !== id ? null : prev));
   };
 
   const updateBlock = (id: string, updates: Partial<LayoutBlock>, remember = false) => {
@@ -777,6 +781,29 @@ export default function App() {
 
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
+  };
+
+  const clearTextDragTimer = () => {
+    if (textDragTimerRef.current) {
+      window.clearTimeout(textDragTimerRef.current);
+      textDragTimerRef.current = null;
+    }
+  };
+
+  const handleTextBlockMouseDown = (e: React.MouseEvent, block: LayoutBlock) => {
+    e.stopPropagation();
+    if (isLocked || isInteractiveTarget(e.target)) return;
+    selectOnly(block.id);
+    if (editingTextId === block.id) return;
+
+    const event = e;
+    clearTextDragTimer();
+    textDragTimerRef.current = window.setTimeout(() => {
+      textDragTimerRef.current = null;
+      setEditingTextId(null);
+      handleDragStart(event, block.id);
+    }, 260);
+    window.addEventListener('mouseup', clearTextDragTimer, { once: true });
   };
 
   const handleDragMove = (e: MouseEvent) => {
@@ -1416,15 +1443,40 @@ export default function App() {
     })
   });
 
-  const buildTemplatePreviewRenderJSON = (template: TemplateJSON): RenderJSON => ({
-    templateId: `${template.templateMeta.templateId}_preview`,
-    canvas: {
-      width: template.grid.columns,
-      height: template.grid.rows
-    },
-    elements: (template.elements || []).map((element, index) => {
+  const buildTemplatePreviewRenderJSON = (template: TemplateJSON, userMessage: string): RenderJSON => {
+    const enabledTextAssets = textAssetsEnabled ? textAssets : [];
+    const firstPromptLine = userMessage.split('\n').find(line => line.trim())?.trim();
+    const titleText = enabledTextAssets.find(asset => asset.role === 'title')?.content || firstPromptLine || (language === 'zh' ? '生成后的页面标题' : 'Generated page title');
+    const subtitleText = enabledTextAssets.find(asset => asset.role === 'subtitle')?.content || (language === 'zh' ? '生成后的章节说明' : 'Generated section context');
+    const bodyText = enabledTextAssets.find(asset => asset.role === 'body')?.content || userMessage || (language === 'zh' ? '生成后的正文摘要会放在这里。' : 'Generated body summary will appear here.');
+    const captionText = enabledTextAssets.find(asset => asset.role === 'caption')?.content || (language === 'zh' ? '生成后的图片说明。' : 'Generated image caption.');
+    const labelText = enabledTextAssets.find(asset => asset.role === 'label')?.content || (language === 'zh' ? '生成后的信息标签' : 'Generated label');
+    const imageRoleLabel = (role: string) => {
+      if (/portrait|participant|user|interview/i.test(role)) return language === 'zh' ? '人物 / 用户 / 访谈照片' : 'portrait, user, or interview photo';
+      if (/chart|data|stat|diagram|map|visualization/i.test(role)) return language === 'zh' ? '图表 / 数据 / 结构图' : 'chart, data, or diagram image';
+      if (/product|prototype|component|material|outcome/i.test(role)) return language === 'zh' ? '产品 / 原型 / 组件照片' : 'product, prototype, or component photo';
+      if (/hero|background|context/i.test(role)) return language === 'zh' ? '清晰主视觉或背景图' : 'clear hero or context image';
+      return language === 'zh' ? '与该槽位语义匹配的图片' : 'image matching this slot intent';
+    };
+    const generatedTextForSlot = (element: NonNullable<TemplateJSON['elements']>[number], index: number) => {
+      const role = `${element.role} ${element.slotId}`.toLowerCase();
+      if (element.type === 'image') {
+        return `${language === 'zh' ? '图片槽位' : 'Image slot'}\n${imageRoleLabel(element.role)}\n${language === 'zh' ? '不匹配可留空或稍后替换' : 'Leave blank if no matching asset exists'}`;
+      }
+      if (element.style === 'title' || /title|hero|headline/.test(role)) return titleText;
+      if (element.style === 'heading' || /heading|section|subtitle/.test(role)) return index % 2 === 0 ? subtitleText : labelText;
+      if (element.type === 'caption' || /caption|note|annotation|label/.test(role)) return captionText || labelText;
+      return bodyText;
+    };
+
+    return {
+      templateId: `${template.templateMeta.templateId}_preview`,
+      canvas: {
+        width: template.grid.columns,
+        height: template.grid.rows
+      },
+      elements: (template.elements || []).map((element, index) => {
       const isImageSlot = element.type === 'image';
-      const slotUse = element.contentSummary || element.role || element.slotId;
       return {
         type: isImageSlot ? 'caption' : element.type,
         id: `preview_${element.slotId}`,
@@ -1435,9 +1487,7 @@ export default function App() {
         style: isImageSlot ? 'caption' : element.style,
         crop: element.crop,
         zIndex: element.zIndex || index + 1,
-        content: isImageSlot
-          ? `${language === 'zh' ? '图片槽位' : 'Image slot'}\n${element.role}\n${slotUse}`
-          : (element.contentSummary || element.role || element.slotId),
+        content: generatedTextForSlot(element, index),
         textRules: {
           maxChars: isImageSlot ? 120 : element.textRules?.maxChars || 90,
           fontSize: isImageSlot ? 9 : element.textRules?.fontSize || 11,
@@ -1447,7 +1497,8 @@ export default function App() {
         }
       };
     })
-  });
+    };
+  };
 
   const getPreviewTemplate = () => {
     if (referenceMode === 'upload') return uploadedReferenceTemplate;
@@ -1524,7 +1575,7 @@ export default function App() {
       throw new Error(language === 'zh' ? '模板还没有加载完成，请稍后再试。' : 'Templates are still loading.');
     }
 
-    const previewRenderJSON = buildTemplatePreviewRenderJSON(template);
+    const previewRenderJSON = buildTemplatePreviewRenderJSON(template, userMessage);
     rememberBlocks();
     setLayoutMode('editorial');
     setLastRenderJSON(previewRenderJSON);
@@ -1823,7 +1874,7 @@ export default function App() {
                 onToggle={() => toggleSection('pageType')}
                 meta={referenceMode === 'template' ? t.template : t.ownReference}
               >
-                <div className="grid grid-cols-2 gap-1 mb-3">
+                <div className="mb-3 border border-swiss-black/10 bg-white/55 p-1">
                   {[
                     { value: 'template' as const, label: t.template, help: t.templateHelp },
                     { value: 'upload' as const, label: t.ownReference, help: t.ownReferenceHelp },
@@ -1831,20 +1882,19 @@ export default function App() {
                     <button
                       key={option.value}
                       onClick={() => setReferenceMode(option.value)}
-                      className={`min-h-12 border p-2 text-left transition-colors ${
+                      className={`inline-flex h-7 w-1/2 items-center justify-center text-[9px] font-black uppercase tracking-widest transition-colors ${
                         referenceMode === option.value
-                          ? 'bg-swiss-red text-white border-swiss-red'
-                          : 'bg-white/60 text-swiss-black border-swiss-black/10 hover:border-swiss-red'
+                          ? 'bg-swiss-black text-white'
+                          : 'text-swiss-black/40 hover:text-swiss-red'
                       }`}
+                      title={option.help}
                     >
-                      <span className="block text-[10px] font-black uppercase tracking-widest">{option.label}</span>
-                      <span className={`block mt-1 text-[8px] leading-tight ${
-                        referenceMode === option.value ? 'text-white/75' : 'text-swiss-black/35'
-                      }`}>
-                        {option.help}
-                      </span>
+                      {option.label}
                     </button>
                   ))}
+                  <p className="px-1.5 pb-1.5 pt-2 text-[8px] leading-snug text-swiss-black/35">
+                    {referenceMode === 'template' ? t.templateHelp : t.ownReferenceHelp}
+                  </p>
                 </div>
 
                 {referenceMode === 'template' ? (
@@ -2346,6 +2396,7 @@ export default function App() {
                 const isDragging = dragPreview?.id === block.id;
                 const isSelected = selectedIds.includes(block.id);
                 const isTextLayer = isTextBlock(block.type);
+                const isEditingText = editingTextId === block.id;
                 const blockOverflowMode = block.overflowMode || (isTextLayer ? 'visible' : 'clip');
                 const rect = isDragging 
                   ? getPixelRect(dragPreview!.x, dragPreview!.y, block.w, block.h, gridMetrics)
@@ -2374,9 +2425,19 @@ export default function App() {
                       }
                     }}
                     onMouseDown={(e) => {
-                      e.stopPropagation();
                       if (isInteractiveTarget(e.target)) return;
+                      if (isTextLayer) {
+                        handleTextBlockMouseDown(e, block);
+                        return;
+                      }
+                      e.stopPropagation();
                       handleDragStart(e, block.id);
+                    }}
+                    onDoubleClick={(e) => {
+                      if (!isTextLayer) return;
+                      e.stopPropagation();
+                      selectOnly(block.id);
+                      setEditingTextId(block.id);
                     }}
                   >
                     <div
@@ -2457,7 +2518,7 @@ export default function App() {
                               className={`${blockOverflowMode === 'autoHeight' ? 'relative' : 'absolute inset-0'} flex items-start justify-start`}
                               style={{ padding: block.padding ?? 8 }}
                             >
-                              {isSelected ? (
+                              {isEditingText ? (
                                 <textarea
                                   value={block.label}
                                   onChange={(e) => updateBlock(block.id, { label: e.target.value })}
@@ -2498,7 +2559,7 @@ export default function App() {
                               )}
                             </div>
                           ) : block.type === 'text' || block.type === 'heading' ? (
-                            <EditableTextBlock block={block} isSelected={isSelected} updateBlock={updateBlock} />
+                            <EditableTextBlock block={block} isSelected={isSelected} isEditing={isEditingText} updateBlock={updateBlock} />
                           ) : block.type === 'blank' ? (
                             <span className="text-[9px] font-mono font-bold uppercase tracking-widest opacity-50">Blank</span>
                           ) : (
@@ -3134,7 +3195,7 @@ export default function App() {
   );
 }
 
-function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBlock, isSelected: boolean, updateBlock: (id: string, updates: Partial<LayoutBlock>, remember?: boolean) => void }) {
+function EditableTextBlock({ block, isSelected, isEditing, updateBlock }: { block: LayoutBlock, isSelected: boolean, isEditing: boolean, updateBlock: (id: string, updates: Partial<LayoutBlock>, remember?: boolean) => void }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [hasOverflow, setHasOverflow] = useState(false);
   const overflowMode = block.overflowMode || 'visible';
@@ -3154,7 +3215,7 @@ function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBl
     if (el) setHasOverflow(el.scrollHeight > el.clientHeight);
   }, [block.label, block.fontSize, block.w, block.h]);
 
-  if (!isSelected) {
+  if (!isEditing) {
     return (
       <div
         className={`w-full relative leading-snug whitespace-pre-wrap break-words ${
@@ -3169,6 +3230,7 @@ function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBl
             WebkitBoxOrient: 'vertical'
           } : {})
         }}
+        title={isSelected ? 'Double click to edit. Hold briefly, then drag to move.' : undefined}
       >
         {block.label}
       </div>
