@@ -4,7 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 
 const DEFAULT_TEMPLATE_IDS = [
   'discover_context_mapping_16x9',
-  'discover_long_big_image_16x9',
+  'discover_long_medical_strip',
   'define_concept_sketch_long_16x9',
   'develop_prototype_demo_16x9',
   'deliver_final_outcome_16x9'
@@ -67,7 +67,7 @@ const analyzeProjectContent = (prompt, textAssets = []) => {
 
 const countMatches = (text, keywords) => keywords.reduce((count, keyword) => count + (text.includes(keyword) ? 1 : 0), 0);
 
-const buildContentProfile = ({ prompt = '', textAssets = [], imageAssets = [], contentJSON = {}, analysis }) => {
+const buildContentProfile = ({ prompt = '', textAssets = [], imageAssets = [], contentJSON = {}, analysis, canvasPresetId = 'digital-16-9' }) => {
   const contentText = [
     prompt,
     ...textAssets.map(asset => `${asset.title || ''}\n${asset.content || ''}`),
@@ -104,6 +104,8 @@ const buildContentProfile = ({ prompt = '', textAssets = [], imageAssets = [], c
       comparisonLayout: comparisonCount > 0,
       solutionSketchLayout: analysis.detectedStage === 'define' || keywordIncludes(contentText, ['solution', 'sketch', 'concept', '方案', '草图', '实验'])
     },
+    canvasPresetId,
+    canvasRatio: canvasPresetId === 'strip-1800-768' ? '1800:768' : '16:9',
     density,
     keywords: analysis.contentTypesFound
   };
@@ -116,6 +118,23 @@ const scoreTemplateMatch = (contentProfile, template) => {
   const reasons = [];
   const risks = [];
   let score = 0;
+  const templateId = template.templateMeta?.templateId || '';
+  const isStripTemplate = templateId === 'discover_long_medical_strip' || profile.canvas?.ratio === '1800:768';
+  const isStripCanvas = contentProfile.canvasPresetId === 'strip-1800-768';
+
+  if (isStripTemplate && !isStripCanvas) {
+    return {
+      templateId,
+      score: 0,
+      reason: ['strip template is disabled outside 1800x768 canvas'],
+      risk: ['requires STRIP_1800x768 viewport']
+    };
+  }
+
+  if (!isStripTemplate && isStripCanvas && stage === 'discover') {
+    score -= 12;
+    risks.push('16:9 discover template may not fit strip canvas');
+  }
 
   if (stage === contentProfile.stage) {
     score += 28;
@@ -182,7 +201,7 @@ const scoreTemplateMatch = (contentProfile, template) => {
   }
 
   return {
-    templateId: template.templateMeta.templateId,
+    templateId,
     score: Math.max(0, Math.min(100, score)),
     reason: reasons,
     risk: risks
@@ -191,7 +210,10 @@ const scoreTemplateMatch = (contentProfile, template) => {
 
 const selectTemplate = (analysis, templates, selectedTemplateId, contentProfile) => {
   if (selectedTemplateId && selectedTemplateId !== 'auto') {
-    const selected = templates.find(template => template.templateMeta.templateId === selectedTemplateId) || templates[0];
+    const safeSelectedTemplateId = selectedTemplateId === 'discover_long_medical_strip' && contentProfile.canvasPresetId !== 'strip-1800-768'
+      ? 'discover_context_mapping_16x9'
+      : selectedTemplateId;
+    const selected = templates.find(template => template.templateMeta.templateId === safeSelectedTemplateId) || templates[0];
     const matches = templates
       .map(template => scoreTemplateMatch(contentProfile, template))
       .sort((a, b) => b.score - a.score);
@@ -435,19 +457,51 @@ const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
   };
 };
 
-const normalizeReferenceTemplate = (raw) => {
+const normalizeReferenceTemplate = (raw, referenceImages = []) => {
   const source = raw.referenceTemplate || raw.template || raw;
   const rawElements = Array.isArray(source.elements) ? source.elements : [];
+  const referenceImage = referenceImages[0] || {};
+  const sourceCanvasBounds = source.canvasBounds || raw.canvasBounds || {};
+  const canvasBounds = {
+    x: clampNumber(sourceCanvasBounds.x, 0, Number.MAX_SAFE_INTEGER, 0),
+    y: clampNumber(sourceCanvasBounds.y, 0, Number.MAX_SAFE_INTEGER, 0),
+    w: clampNumber(sourceCanvasBounds.w || sourceCanvasBounds.width, 1, Number.MAX_SAFE_INTEGER, referenceImage.width || REFERENCE_GRID_WIDTH),
+    h: clampNumber(sourceCanvasBounds.h || sourceCanvasBounds.height, 1, Number.MAX_SAFE_INTEGER, referenceImage.height || REFERENCE_GRID_HEIGHT)
+  };
+  const hasPixelCanvasBounds = Boolean(sourceCanvasBounds.w || sourceCanvasBounds.width || sourceCanvasBounds.h || sourceCanvasBounds.height);
+  const toGridBounds = (element, index, type) => {
+    const relative = element.relativeBounds || element.normalizedBounds;
+    const pixel = element.pixelBounds || element.bounds;
+    if (relative && Number.isFinite(Number(relative.x)) && Number.isFinite(Number(relative.y))) {
+      const x = clampNumber(Number(relative.x) * REFERENCE_GRID_WIDTH, 0, REFERENCE_GRID_WIDTH - 1, index % REFERENCE_GRID_WIDTH);
+      const y = clampNumber(Number(relative.y) * REFERENCE_GRID_HEIGHT, 0, REFERENCE_GRID_HEIGHT - 1, Math.floor(index / 6));
+      const w = clampNumber(Number(relative.w || relative.width) * REFERENCE_GRID_WIDTH, 1, REFERENCE_GRID_WIDTH - x, type === 'image' ? 6 : 4);
+      const h = clampNumber(Number(relative.h || relative.height) * REFERENCE_GRID_HEIGHT, 1, REFERENCE_GRID_HEIGHT - y, type === 'image' ? 4 : 2);
+      return { x, y, w, h };
+    }
+
+    const pixelLike = pixel || (hasPixelCanvasBounds && (Number(element.x) > REFERENCE_GRID_WIDTH || Number(element.y) > REFERENCE_GRID_HEIGHT) ? element : null);
+    if (pixelLike && Number.isFinite(Number(pixelLike.x)) && Number.isFinite(Number(pixelLike.y))) {
+      const x = clampNumber(((Number(pixelLike.x) - canvasBounds.x) / canvasBounds.w) * REFERENCE_GRID_WIDTH, 0, REFERENCE_GRID_WIDTH - 1, index % REFERENCE_GRID_WIDTH);
+      const y = clampNumber(((Number(pixelLike.y) - canvasBounds.y) / canvasBounds.h) * REFERENCE_GRID_HEIGHT, 0, REFERENCE_GRID_HEIGHT - 1, Math.floor(index / 6));
+      const w = clampNumber((Number(pixelLike.w || pixelLike.width) / canvasBounds.w) * REFERENCE_GRID_WIDTH, 1, REFERENCE_GRID_WIDTH - x, type === 'image' ? 6 : 4);
+      const h = clampNumber((Number(pixelLike.h || pixelLike.height) / canvasBounds.h) * REFERENCE_GRID_HEIGHT, 1, REFERENCE_GRID_HEIGHT - y, type === 'image' ? 4 : 2);
+      return { x, y, w, h };
+    }
+
+    const x = clampNumber(element.x, 0, REFERENCE_GRID_WIDTH - 1, index % REFERENCE_GRID_WIDTH);
+    const y = clampNumber(element.y, 0, REFERENCE_GRID_HEIGHT - 1, Math.floor(index / 6));
+    const w = clampNumber(element.w, 1, REFERENCE_GRID_WIDTH - x, type === 'image' ? 6 : 4);
+    const h = clampNumber(element.h, 1, REFERENCE_GRID_HEIGHT - y, type === 'image' ? 4 : 2);
+    return { x, y, w, h };
+  };
   const elements = rawElements
     .slice(0, 48)
     .map((element, index) => {
       const type = ['image', 'text', 'caption', 'annotation', 'shape', 'divider', 'chart'].includes(element.type)
         ? element.type
         : 'text';
-      const x = clampNumber(element.x, 0, REFERENCE_GRID_WIDTH - 1, index % REFERENCE_GRID_WIDTH);
-      const y = clampNumber(element.y, 0, REFERENCE_GRID_HEIGHT - 1, Math.floor(index / 6));
-      const w = clampNumber(element.w, 1, REFERENCE_GRID_WIDTH - x, type === 'image' ? 6 : 4);
-      const h = clampNumber(element.h, 1, REFERENCE_GRID_HEIGHT - y, type === 'image' ? 4 : 2);
+      const { x, y, w, h } = toGridBounds(element, index, type);
       const role = String(element.role || (type === 'image' ? 'reference_image_slot' : 'reference_text_slot'));
       const slotId = String(element.slotId || element.id || `reference_${type}_${index + 1}`)
         .replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -520,7 +574,7 @@ const normalizeReferenceTemplate = (raw) => {
       suitableFor: ['uploaded reference', 'custom layout structure', 'AI asset assignment']
     },
     canvas: {
-      ratio: '16:9',
+      ratio: source.canvas?.ratio || (referenceImages[0]?.width && referenceImages[0]?.height ? `${referenceImages[0].width}:${referenceImages[0].height}` : '16:9'),
       orientation: 'landscape',
       backgroundColor: source.canvas?.backgroundColor || '#F8F6EC'
     },
@@ -549,6 +603,7 @@ const normalizeReferenceTemplate = (raw) => {
     },
     sections: Array.isArray(source.sections) ? source.sections : [],
     groups: Array.isArray(source.groups) ? source.groups : [],
+    canvasBounds: hasPixelCanvasBounds ? canvasBounds : undefined,
     elements: safeElements,
     contentRequirements: {
       required: safeElements.filter(element => element.required).map(element => element.slotId),
@@ -671,6 +726,7 @@ export default async function handler(req, res) {
     const {
       prompt = '',
       selectedTemplateId = 'auto',
+      canvasPresetId = 'digital-16-9',
       referenceMode = 'template',
       action = 'generate-layout',
       customTemplate = null,
@@ -683,7 +739,7 @@ export default async function handler(req, res) {
     const templateIds = await loadTemplateIds();
     const templates = await Promise.all(templateIds.map(loadTemplate));
     const analysis = analyzeProjectContent(prompt, textAssets);
-    const contentProfile = buildContentProfile({ prompt, textAssets, imageAssets, contentJSON, analysis });
+    const contentProfile = buildContentProfile({ prompt, textAssets, imageAssets, contentJSON, analysis, canvasPresetId });
     const hasCustomTemplate = customTemplate && Array.isArray(customTemplate.elements);
     const useUploadedReference = referenceMode === 'upload' && referenceImages.length > 0 && !hasCustomTemplate;
     const selection = hasCustomTemplate
@@ -767,8 +823,14 @@ Critical rules:
 - Do NOT output final Render JSON.
 - Do NOT use external URLs.
 - Output a reusable template with slot geometry, roles, and textRules.
+- First identify the real design canvas bounds inside the uploaded image. Exclude screenshot background, white outer padding, browser/app chrome, outer grid background, and decorative corner markers unless they are part of the actual layout.
+- Output canvasBounds in source image pixel coordinates. All element positions must be measured relative to that real design canvas, not the full uploaded PNG.
+- Prefer outputting relativeBounds with x, y, w, h in 0-1 coordinates relative to canvasBounds. You may also output pixelBounds in source image pixels. The server will convert these into the 24x16 grid.
 - Preserve the reference image's layout rhythm: large regions, small repeated cards, grouped rows, captions, overlap, and hierarchy.
+- If a collage, diagram cluster, chart group, repeated photo row, or set of very close visual elements works as one visual unit, recognize it as ONE image slot instead of many tiny slots.
+- However, text and image must always stay separate. Do not merge readable text into an image slot unless the text is an inseparable part of a chart/diagram screenshot.
 - Prefer 12-36 useful slots. Avoid tiny decorative fragments unless they affect composition.
+- Do not redesign the layout. Recover the reference structure as faithfully as possible.
 - Return only valid JSON. No markdown.
 
 Required JSON schema:
@@ -784,6 +846,7 @@ Required JSON schema:
       "suitableFor": ["uploaded reference"]
     },
     "canvas": { "ratio": "16:9", "orientation": "landscape", "backgroundColor": "#F8F6EC" },
+    "canvasBounds": { "x": 0, "y": 0, "w": 1000, "h": 600 },
     "grid": { "columns": 24, "rows": 16, "columnGap": 10, "rowGap": 10, "margin": 48 },
     "sections": [],
     "groups": [],
@@ -800,6 +863,8 @@ Required JSON schema:
         "crop": "cover | contain",
         "zIndex": 1,
         "required": true,
+        "relativeBounds": { "x": 0, "y": 0, "w": 0.25, "h": 0.2 },
+        "pixelBounds": { "x": 0, "y": 0, "w": 250, "h": 120 },
         "contentSummary": "what this slot should contain",
         "textRules": {
           "maxChars": 80,
@@ -822,6 +887,7 @@ Required JSON schema:
 
 You will receive uploaded reference layout images plus available project imageAssets and textAssets.
 Study the reference image composition first: visual rhythm, hierarchy, image/text balance, density, overlap, margins, and approximate grid placement.
+Before placing elements, identify the real design canvas bounds inside the uploaded image and ignore screenshot padding/background. If visual items are a tight collage or chart cluster, treat them as one visual element, but keep readable text separate from images.
 
 Important:
 - In this mode, do NOT use selectedTemplate.elements or any template slots.
@@ -867,6 +933,7 @@ Required JSON schema:
       analysis,
       contentProfile,
       templateMatches,
+      canvasPresetId,
       selectedTemplate: useUploadedReference ? null : selectedTemplateSummary,
       availableTemplates: useUploadedReference ? [] : templates.map(template => ({
         templateId: template.templateMeta.templateId,
@@ -922,7 +989,7 @@ Required JSON schema:
 
     const parsed = JSON.parse((response.text || '{}').replace(/```json|```/g, '').trim());
     if (action === 'generate-reference-template') {
-      const referenceTemplate = normalizeReferenceTemplate(parsed);
+      const referenceTemplate = normalizeReferenceTemplate(parsed, referenceImages);
       return res.status(200).json({
         referenceTemplate,
         renderJSON: buildTemplatePreviewRenderJSON(referenceTemplate),

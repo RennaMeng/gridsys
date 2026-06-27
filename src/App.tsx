@@ -115,11 +115,17 @@ const CANVAS_PRESETS: Array<{
 ];
 
 const STAGE_TEMPLATE_MAP: Record<PageStage, string> = {
-  discover: 'discover_long_big_image_16x9',
+  discover: 'discover_context_mapping_16x9',
   define: 'define_concept_sketch_long_16x9',
   develop: 'develop_prototype_demo_16x9',
   deliver: 'deliver_final_outcome_16x9'
 };
+
+const getDefaultTemplateForStage = (stage: PageStage, presetId: CanvasPresetId) => (
+  stage === 'discover' && presetId === 'strip-1800-768'
+    ? 'discover_long_medical_strip'
+    : STAGE_TEMPLATE_MAP[stage]
+);
 
 const UI_TEXT = {
   zh: {
@@ -366,7 +372,7 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<TemplateJSON[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>(STAGE_TEMPLATE_MAP.discover);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>(getDefaultTemplateForStage('discover', 'digital-16-9'));
   const [uploadedReferenceTemplate, setUploadedReferenceTemplate] = useState<TemplateJSON | null>(null);
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
@@ -491,11 +497,14 @@ export default function App() {
   const selectCanvasPreset = (preset: typeof CANVAS_PRESETS[number]) => {
     setCanvasPresetId(preset.id);
     setCanvasOrientation(preset.defaultOrientation);
+    if (referenceMode === 'template' && pageStage === 'discover') {
+      setSelectedTemplateId(getDefaultTemplateForStage('discover', preset.id));
+    }
   };
 
   const selectPageStage = (stage: PageStage) => {
     setPageStage(stage);
-    setSelectedTemplateId(STAGE_TEMPLATE_MAP[stage]);
+    setSelectedTemplateId(getDefaultTemplateForStage(stage, canvasPresetId));
   };
 
   const toggleSection = (section: string) => {
@@ -1186,6 +1195,7 @@ export default function App() {
         },
         body: JSON.stringify({
           action: 'generate-reference-template',
+          canvasPresetId,
           prompt: language === 'zh'
             ? '只分析参考图的版式结构，生成可复用模板。'
             : 'Analyze only the reference layout structure and generate a reusable template.',
@@ -1252,6 +1262,7 @@ export default function App() {
         body: JSON.stringify({
           prompt: userMessage,
           selectedTemplateId,
+          canvasPresetId,
           referenceMode,
           customTemplate: useOwnReference ? uploadedReferenceTemplate : undefined,
           contentJSON,
@@ -1514,7 +1525,7 @@ export default function App() {
                   <>
                     <div className="grid grid-cols-2 gap-1">
                       {(['discover', 'define', 'develop', 'deliver'] as PageStage[]).map(stage => {
-                        const templateId = STAGE_TEMPLATE_MAP[stage];
+                        const templateId = getDefaultTemplateForStage(stage, canvasPresetId);
                         const template = availableTemplates.find(item => item.templateMeta.templateId === templateId);
                         return (
                           <button

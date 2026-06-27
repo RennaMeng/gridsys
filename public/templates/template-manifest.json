@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-27T11:31:29.068Z",
+  "generatedAt": "2026-06-27T13:20:22.520Z",
   "templates": [
     {
       "templateId": "discover_context_mapping_16x9",
@@ -63,41 +63,41 @@
       }
     },
     {
-      "templateId": "discover_long_big_image_16x9",
+      "templateId": "discover_long_medical_strip",
       "stage": "discover",
-      "templateName": "Discover Long Big Image Board",
-      "source": "discover(longsize,bigimage).json",
+      "templateName": "Discover Long Medical Strip",
+      "source": "long_medical.json",
       "profile": {
         "stage": "discover",
         "pageIntent": [
-          "background research",
-          "problem discovery",
-          "context definition",
-          "evidence mapping",
-          "material or behavior insight"
+          "long-format research report",
+          "background evidence",
+          "data visualization",
+          "interview insights",
+          "field research"
         ],
         "canvas": {
-          "ratio": "16:9",
+          "ratio": "1800:768",
           "orientation": "landscape"
         },
         "structure": {
-          "sectionCount": 4,
-          "textSlotCount": 15,
-          "imageSlotCount": 9,
+          "sectionCount": 3,
+          "textSlotCount": 24,
+          "imageSlotCount": 11,
           "chartSlotCount": 0,
-          "dataPointCount": 7,
-          "stepCount": 16,
+          "dataPointCount": 6,
+          "stepCount": 1,
           "comparisonCount": 0,
           "density": "high",
-          "hasHeroImage": true,
-          "hasBigImage": true,
-          "hasProcessFlow": true,
+          "hasHeroImage": false,
+          "hasBigImage": false,
+          "hasProcessFlow": false,
           "hasSketchArea": false
         },
         "strengths": [
-          "strong full-height visual anchor",
-          "supports background research and context explanation",
-          "supports evidence diagrams or context maps as images",
+          "three-column long-format research report structure",
+          "supports dense background, research, and interview evidence",
+          "supports charts, diagrams, and participant evidence as visual slots",
           "supports source-to-impact or behavior sequence"
         ],
         "risks": [
@@ -106,8 +106,8 @@
         ],
         "bestFor": [
           "discover pages focused on background research",
-          "problem context overview with one dominant image",
-          "evidence mapping and behavior insight",
+          "long strip canvases with dense research evidence",
+          "data-heavy reports with interviews or user narratives",
           "process-chain explanation"
         ],
         "avoidFor": [

@@ -1,0 +1,1049 @@
+{
+  "templateMeta": {
+    "templateId": "discover_long_medical_strip",
+    "templateName": "Discover Long Medical Strip",
+    "pageType": "discover",
+    "doubleDiamondStage": "discover",
+    "layoutPurpose": "long_strip_background_research_data_visualization_and_interview_insights",
+    "narrativeRole": "turn_dense_research_material_into_background_evidence_and_interview_logic",
+    "suitableFor": [
+      "discover page",
+      "strip canvas",
+      "background research",
+      "data visualization",
+      "interview insights",
+      "field research"
+    ],
+    "source": "long_medical.json"
+  },
+  "templateProfile": {
+    "stage": "discover",
+    "pageIntent": [
+      "long-format research report",
+      "background evidence",
+      "data visualization",
+      "interview insights",
+      "field research"
+    ],
+    "canvas": {
+      "ratio": "1800:768",
+      "orientation": "landscape"
+    },
+    "structure": {
+      "sectionCount": 3,
+      "textSlotCount": 24,
+      "imageSlotCount": 11,
+      "chartSlotCount": 0,
+      "dataPointCount": 6,
+      "stepCount": 1,
+      "comparisonCount": 0,
+      "density": "high",
+      "hasHeroImage": false,
+      "hasBigImage": false,
+      "hasProcessFlow": false,
+      "hasSketchArea": false
+    },
+    "strengths": [
+      "three-column long-format research report structure",
+      "supports dense background, research, and interview evidence",
+      "supports charts, diagrams, and participant evidence as visual slots",
+      "supports source-to-impact or behavior sequence"
+    ],
+    "risks": [
+      "many small text slots require concise copy",
+      "best results need enough visual assets for process and experiment slots"
+    ],
+    "bestFor": [
+      "discover pages focused on background research",
+      "long strip canvases with dense research evidence",
+      "data-heavy reports with interviews or user narratives",
+      "process-chain explanation"
+    ],
+    "avoidFor": [
+      "photo-only moodboards with almost no text",
+      "final outcome pages that need validation feedback",
+      "content with very long narrative paragraphs"
+    ]
+  },
+  "canvas": {
+    "ratio": "1800:768",
+    "backgroundColor": "#F8F6EC"
+  },
+  "grid": {
+    "type": "strict_grid",
+    "columns": 24,
+    "rows": 16,
+    "columnGap": 0,
+    "rowGap": 0,
+    "margin": 48,
+    "layoutDensity": "high",
+    "alignment": "modular",
+    "coordinateSystem": "24x16_grid"
+  },
+  "layoutRules": {
+    "density": "high",
+    "alignToGrid": true,
+    "preserveTemplateGeometry": true,
+    "avoidProjectSpecificCopy": true,
+    "preferredReadingOrder": "left_to_right_with_right_column_iteration_sequence",
+    "imageStrategy": "Use uploaded sketches, diagrams, process photos, and prototype images. Treat charts and diagrams as image assets when needed."
+  },
+  "designSystem": {
+    "summary": "High-density long strip research board with three vertical evidence columns for inspiration, research, and interview insights.",
+    "typography": "bold condensed headings, compact body text, small captions",
+    "colorLogic": "neutral board with accent blocks or banners reserved for key insight"
+  },
+  "sections": [
+    {
+      "id": "inspiration_background",
+      "label": "Inspiration & Background",
+      "purpose": "Introduce the research origin, background evidence, and first layer of data visualization.",
+      "slots": [
+        "inspiration_title",
+        "inspiration_context_image",
+        "inspiration_body_text",
+        "background_title",
+        "background_summary",
+        "background_map_visual",
+        "background_key_data_a",
+        "background_key_data_b",
+        "background_key_data_c",
+        "background_trend_chart"
+      ]
+    },
+    {
+      "id": "research_challenge",
+      "label": "Research & Challenge",
+      "purpose": "Present research findings, system diagrams, key data points, and challenge synthesis.",
+      "slots": [
+        "research_title",
+        "research_intro_text",
+        "research_distribution_visual",
+        "research_distribution_notes",
+        "research_key_percentage",
+        "research_bar_chart",
+        "research_method_text",
+        "challenge_title",
+        "challenge_system_diagram",
+        "challenge_diagram_annotations",
+        "challenge_list_text",
+        "research_conclusion_card"
+      ]
+    },
+    {
+      "id": "interview_insights",
+      "label": "Interview Insights",
+      "purpose": "Show field interviews, participant stories, quotes, avatars, and final research conclusion.",
+      "slots": [
+        "interview_title",
+        "interview_intro_text",
+        "interview_question",
+        "participant_1_image",
+        "participant_1_details",
+        "participant_1_quote",
+        "participant_1_avatar",
+        "participant_2_quote",
+        "participant_2_avatar",
+        "participant_3_quote",
+        "participant_3_avatar",
+        "conclusion_title",
+        "conclusion_body_text"
+      ]
+    }
+  ],
+  "groups": [],
+  "elements": [
+    {
+      "slotId": "inspiration_title",
+      "type": "text",
+      "role": "title",
+      "x": 0,
+      "y": 0,
+      "w": 8,
+      "h": 1,
+      "style": "title",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Main heading for the inspiration or project origin section.",
+      "textRules": {
+        "maxChars": 48,
+        "fontSize": 24,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "inspiration_context_image",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 0,
+      "y": 1,
+      "w": 3,
+      "h": 3,
+      "style": "image",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Small context image introducing the origin story, user situation, or observed scene.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "inspiration_body_text",
+      "type": "text",
+      "role": "body_text",
+      "x": 3,
+      "y": 1,
+      "w": 5,
+      "h": 3,
+      "style": "body",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Short origin narrative explaining why this topic matters.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "background_title",
+      "type": "text",
+      "role": "title",
+      "x": 0,
+      "y": 4,
+      "w": 8,
+      "h": 1,
+      "style": "heading",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Heading for background research.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "background_summary",
+      "type": "text",
+      "role": "body_text",
+      "x": 0,
+      "y": 5,
+      "w": 8,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Short background paragraph describing the scale, urgency, or context.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "background_map_visual",
+      "type": "image",
+      "role": "background",
+      "x": 0,
+      "y": 6,
+      "w": 8,
+      "h": 4,
+      "style": "body",
+      "zIndex": 6,
+      "required": true,
+      "contentSummary": "Map, contextual diagram, or large data visualization background.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "background_key_data_a",
+      "type": "text",
+      "role": "annotation",
+      "x": 2,
+      "y": 8,
+      "w": 3,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Large key data point or highlighted statistic.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "background_key_data_b",
+      "type": "text",
+      "role": "annotation",
+      "x": 5,
+      "y": 7,
+      "w": 3,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Second highlighted statistic or prevalence indicator.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "background_key_data_c",
+      "type": "text",
+      "role": "annotation",
+      "x": 5,
+      "y": 8,
+      "w": 3,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Supporting number or data label.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "background_trend_chart",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 0,
+      "y": 10,
+      "w": 8,
+      "h": 6,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Chart or data visualization showing trend, distribution, or age/group pattern.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "research_title",
+      "type": "text",
+      "role": "title",
+      "x": 8,
+      "y": 0,
+      "w": 8,
+      "h": 1,
+      "style": "heading",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Main heading for research section.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "research_intro_text",
+      "type": "text",
+      "role": "body_text",
+      "x": 8,
+      "y": 1,
+      "w": 8,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Short introduction to research findings.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "research_distribution_visual",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 8,
+      "y": 2,
+      "w": 2,
+      "h": 5,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Diagram or chart visualizing distribution, segmentation, or categories.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "research_distribution_notes",
+      "type": "text",
+      "role": "annotation",
+      "x": 10,
+      "y": 2,
+      "w": 6,
+      "h": 3,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Annotations explaining the distribution diagram.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "research_key_percentage",
+      "type": "text",
+      "role": "annotation",
+      "x": 10,
+      "y": 5,
+      "w": 6,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Large highlighted percentage or data callout.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "research_bar_chart",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 10,
+      "y": 6,
+      "w": 6,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Compact chart or comparison visualization.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "research_method_text",
+      "type": "text",
+      "role": "body_text",
+      "x": 10,
+      "y": 7,
+      "w": 6,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Short text explaining technology, method, or mechanism.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "challenge_title",
+      "type": "text",
+      "role": "title",
+      "x": 8,
+      "y": 8,
+      "w": 8,
+      "h": 1,
+      "style": "heading",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Heading for challenge, pain point, or opportunity section.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "challenge_system_diagram",
+      "type": "image",
+      "role": "background",
+      "x": 8,
+      "y": 9,
+      "w": 8,
+      "h": 5,
+      "style": "body",
+      "zIndex": 19,
+      "required": false,
+      "contentSummary": "Human, system, service, or mechanism diagram used as a background visual.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "challenge_diagram_annotations",
+      "type": "text",
+      "role": "annotation",
+      "x": 8,
+      "y": 9,
+      "w": 8,
+      "h": 5,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Labels and callouts attached to the challenge diagram.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "challenge_list_text",
+      "type": "text",
+      "role": "body_text",
+      "x": 12,
+      "y": 9,
+      "w": 4,
+      "h": 3,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "List of pain points, constraints, or user challenges.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "research_conclusion_card",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 8,
+      "y": 14,
+      "w": 8,
+      "h": 2,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Highlighted conclusion or opportunity card.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "interview_title",
+      "type": "text",
+      "role": "title",
+      "x": 16,
+      "y": 0,
+      "w": 8,
+      "h": 1,
+      "style": "heading",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Main heading for interview or field research section.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "interview_intro_text",
+      "type": "text",
+      "role": "body_text",
+      "x": 16,
+      "y": 1,
+      "w": 8,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Short introduction to interview context.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "interview_question",
+      "type": "text",
+      "role": "annotation",
+      "x": 16,
+      "y": 2,
+      "w": 8,
+      "h": 1,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Interview question or research prompt.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "participant_1_image",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 16,
+      "y": 3,
+      "w": 3,
+      "h": 3,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Portrait or field image for the first participant/story.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "participant_1_details",
+      "type": "text",
+      "role": "body_text",
+      "x": 19,
+      "y": 3,
+      "w": 5,
+      "h": 3,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Details or profile text for the first participant/story.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "participant_1_quote",
+      "type": "text",
+      "role": "body_text",
+      "x": 16,
+      "y": 6,
+      "w": 6,
+      "h": 2,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Quote or insight from the first participant/story.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "participant_1_avatar",
+      "type": "image",
+      "role": "annotation",
+      "x": 22,
+      "y": 6,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Small portrait/avatar image for the first quote.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "participant_2_quote",
+      "type": "text",
+      "role": "body_text",
+      "x": 16,
+      "y": 8,
+      "w": 6,
+      "h": 2,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Quote or insight from the second participant/story.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "participant_2_avatar",
+      "type": "image",
+      "role": "annotation",
+      "x": 22,
+      "y": 8,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Small portrait/avatar image for the second quote.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "participant_3_quote",
+      "type": "text",
+      "role": "body_text",
+      "x": 16,
+      "y": 10,
+      "w": 6,
+      "h": 2,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Quote or insight from the third participant/story.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "participant_3_avatar",
+      "type": "image",
+      "role": "annotation",
+      "x": 22,
+      "y": 10,
+      "w": 2,
+      "h": 2,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Small portrait/avatar image for the third quote.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "conclusion_title",
+      "type": "text",
+      "role": "title",
+      "x": 16,
+      "y": 12,
+      "w": 8,
+      "h": 1,
+      "style": "heading",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Heading for final discover-stage conclusion.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "conclusion_body_text",
+      "type": "text",
+      "role": "body_text",
+      "x": 16,
+      "y": 13,
+      "w": 8,
+      "h": 3,
+      "style": "body",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Final paragraph summarizing research insight and opportunity.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    }
+  ],
+  "contentRequirements": {
+    "required": [
+      "inspiration_title",
+      "inspiration_context_image",
+      "inspiration_body_text",
+      "background_title",
+      "background_summary",
+      "background_map_visual",
+      "background_key_data_a",
+      "background_key_data_b",
+      "research_title",
+      "challenge_title",
+      "interview_title",
+      "conclusion_title"
+    ],
+    "optional": [
+      "background_key_data_c",
+      "background_trend_chart",
+      "research_intro_text",
+      "research_distribution_visual",
+      "research_distribution_notes",
+      "research_key_percentage",
+      "research_bar_chart",
+      "research_method_text",
+      "challenge_system_diagram",
+      "challenge_diagram_annotations",
+      "challenge_list_text",
+      "research_conclusion_card",
+      "interview_intro_text",
+      "interview_question",
+      "participant_1_image",
+      "participant_1_details",
+      "participant_1_quote",
+      "participant_1_avatar",
+      "participant_2_quote",
+      "participant_2_avatar",
+      "participant_3_quote",
+      "participant_3_avatar",
+      "conclusion_body_text"
+    ]
+  },
+  "slots": {
+    "textSlots": [
+      {
+        "id": "inspiration_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "inspiration_body_text",
+        "role": "body_text",
+        "required": true
+      },
+      {
+        "id": "background_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "background_summary",
+        "role": "body_text",
+        "required": true
+      },
+      {
+        "id": "background_key_data_a",
+        "role": "annotation",
+        "required": true
+      },
+      {
+        "id": "background_key_data_b",
+        "role": "annotation",
+        "required": true
+      },
+      {
+        "id": "background_key_data_c",
+        "role": "annotation",
+        "required": false
+      },
+      {
+        "id": "research_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "research_intro_text",
+        "role": "body_text",
+        "required": false
+      },
+      {
+        "id": "research_distribution_notes",
+        "role": "annotation",
+        "required": false
+      },
+      {
+        "id": "research_key_percentage",
+        "role": "annotation",
+        "required": false
+      },
+      {
+        "id": "research_method_text",
+        "role": "body_text",
+        "required": false
+      },
+      {
+        "id": "challenge_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "challenge_diagram_annotations",
+        "role": "annotation",
+        "required": false
+      },
+      {
+        "id": "challenge_list_text",
+        "role": "body_text",
+        "required": false
+      },
+      {
+        "id": "interview_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "interview_intro_text",
+        "role": "body_text",
+        "required": false
+      },
+      {
+        "id": "interview_question",
+        "role": "annotation",
+        "required": false
+      },
+      {
+        "id": "participant_1_details",
+        "role": "body_text",
+        "required": false
+      },
+      {
+        "id": "participant_1_quote",
+        "role": "body_text",
+        "required": false
+      },
+      {
+        "id": "participant_2_quote",
+        "role": "body_text",
+        "required": false
+      },
+      {
+        "id": "participant_3_quote",
+        "role": "body_text",
+        "required": false
+      },
+      {
+        "id": "conclusion_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "conclusion_body_text",
+        "role": "body_text",
+        "required": false
+      }
+    ],
+    "imageSlots": [
+      {
+        "id": "inspiration_context_image",
+        "role": "supporting_image",
+        "required": true,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "background_map_visual",
+        "role": "background",
+        "required": true,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "background_trend_chart",
+        "role": "supporting_image",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "research_distribution_visual",
+        "role": "supporting_image",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "research_bar_chart",
+        "role": "supporting_image",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "challenge_system_diagram",
+        "role": "background",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "research_conclusion_card",
+        "role": "supporting_image",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "participant_1_image",
+        "role": "supporting_image",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "participant_1_avatar",
+        "role": "annotation",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "participant_2_avatar",
+        "role": "annotation",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "participant_3_avatar",
+        "role": "annotation",
+        "required": false,
+        "cropStyle": "cover"
+      }
+    ]
+  },
+  "styleRules": {
+    "visualDensity": "high",
+    "layoutStyle": "discover_long_medical_strip",
+    "textTone": "abstract project logic, no concrete source-project nouns",
+    "preserveStrongLeftHero": true
+  },
+  "aiGenerationRules": {
+    "mainLogic": "Use only for discover-stage long strip canvases. Assign dense research text, data visualizations, diagrams, and interview material into fixed slots.",
+    "preserveTemplateGeometry": true,
+    "prioritizeUploadedImages": true,
+    "treatDiagramsAndChartsAsImages": true,
+    "abstractSourceTopic": true,
+    "avoid": [
+      "using source JSON project nouns",
+      "inventing coordinates",
+      "turning small captions into long paragraphs",
+      "using this template for final deliverable validation pages"
+    ]
+  },
+  "layoutVariants": [
+    {
+      "variantId": "discover_long_medical_strip",
+      "layoutLogic": "three_column_long_strip_inspiration_research_interview_report"
+    }
+  ]
+}

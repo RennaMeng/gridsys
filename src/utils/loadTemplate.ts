@@ -2,7 +2,7 @@ import { TemplateJSON, TemplateManifest } from './templateTypes';
 
 const DEFAULT_TEMPLATE_IDS = [
   'discover_context_mapping_16x9',
-  'discover_long_big_image_16x9',
+  'discover_long_medical_strip',
   'define_concept_sketch_long_16x9',
   'develop_prototype_demo_16x9',
   'deliver_final_outcome_16x9'

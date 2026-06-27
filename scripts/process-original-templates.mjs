@@ -14,6 +14,7 @@ const existingTemplates = [
 
 const stageFromName = (fileName, raw) => {
   const lower = fileName.toLowerCase();
+  if (lower.includes('medical')) return 'discover';
   if (lower.includes('define')) return 'define';
   if (lower.includes('concept')) return 'define';
   if (lower.includes('develop')) return 'develop';
@@ -104,8 +105,46 @@ const CONCEPT_SLOT_SEQUENCE = [
   ['step_final_diagram', 'Final diagram or sketch image summarizing the proposed design system.']
 ];
 
+const MEDICAL_SLOT_SEQUENCE = [
+  ['inspiration_title', 'Main heading for the inspiration or project origin section.'],
+  ['inspiration_context_image', 'Small context image introducing the origin story, user situation, or observed scene.'],
+  ['inspiration_body_text', 'Short origin narrative explaining why this topic matters.'],
+  ['background_title', 'Heading for background research.'],
+  ['background_summary', 'Short background paragraph describing the scale, urgency, or context.'],
+  ['background_map_visual', 'Map, contextual diagram, or large data visualization background.'],
+  ['background_key_data_a', 'Large key data point or highlighted statistic.'],
+  ['background_key_data_b', 'Second highlighted statistic or prevalence indicator.'],
+  ['background_key_data_c', 'Supporting number or data label.'],
+  ['background_trend_chart', 'Chart or data visualization showing trend, distribution, or age/group pattern.'],
+  ['research_title', 'Main heading for research section.'],
+  ['research_intro_text', 'Short introduction to research findings.'],
+  ['research_distribution_visual', 'Diagram or chart visualizing distribution, segmentation, or categories.'],
+  ['research_distribution_notes', 'Annotations explaining the distribution diagram.'],
+  ['research_key_percentage', 'Large highlighted percentage or data callout.'],
+  ['research_bar_chart', 'Compact chart or comparison visualization.'],
+  ['research_method_text', 'Short text explaining technology, method, or mechanism.'],
+  ['challenge_title', 'Heading for challenge, pain point, or opportunity section.'],
+  ['challenge_system_diagram', 'Human, system, service, or mechanism diagram used as a background visual.'],
+  ['challenge_diagram_annotations', 'Labels and callouts attached to the challenge diagram.'],
+  ['challenge_list_text', 'List of pain points, constraints, or user challenges.'],
+  ['research_conclusion_card', 'Highlighted conclusion or opportunity card.'],
+  ['interview_title', 'Main heading for interview or field research section.'],
+  ['interview_intro_text', 'Short introduction to interview context.'],
+  ['interview_question', 'Interview question or research prompt.'],
+  ['participant_1_image', 'Portrait or field image for the first participant/story.'],
+  ['participant_1_details', 'Details or profile text for the first participant/story.'],
+  ['participant_1_quote', 'Quote or insight from the first participant/story.'],
+  ['participant_1_avatar', 'Small portrait/avatar image for the first quote.'],
+  ['participant_2_quote', 'Quote or insight from the second participant/story.'],
+  ['participant_2_avatar', 'Small portrait/avatar image for the second quote.'],
+  ['participant_3_quote', 'Quote or insight from the third participant/story.'],
+  ['participant_3_avatar', 'Small portrait/avatar image for the third quote.'],
+  ['conclusion_title', 'Heading for final discover-stage conclusion.'],
+  ['conclusion_body_text', 'Final paragraph summarizing research insight and opportunity.']
+];
+
 const genericSlotFor = (element, index, variant = 'bigImage') => {
-  const mapped = variant === 'concept' ? CONCEPT_SLOT_SEQUENCE[index] : GENERIC_SLOT_SEQUENCE[index];
+  const mapped = variant === 'medical' ? MEDICAL_SLOT_SEQUENCE[index] : variant === 'concept' ? CONCEPT_SLOT_SEQUENCE[index] : GENERIC_SLOT_SEQUENCE[index];
   if (mapped) return mapped;
   const typePrefix = element.type === 'image' ? 'image' : element.type === 'caption' ? 'caption' : 'text';
   const role = slugify(element.role || element.type || 'slot');
@@ -123,7 +162,9 @@ const buildTemplateProfile = (stage, elements, sections, variant = 'bigImage') =
 
   return {
     stage,
-    pageIntent: stage === 'define' && variant === 'concept'
+    pageIntent: stage === 'discover' && variant === 'medical'
+      ? ['long-format research report', 'background evidence', 'data visualization', 'interview insights', 'field research']
+      : stage === 'define' && variant === 'concept'
       ? ['design concept', 'relationship diagram', 'interaction principle', 'system mechanism', 'design sketch sequence']
       : stage === 'define'
         ? ['solution sketch', 'concept definition', 'material experiment', 'process structure', 'application mapping']
@@ -131,7 +172,7 @@ const buildTemplateProfile = (stage, elements, sections, variant = 'bigImage') =
         ? ['background research', 'problem discovery', 'context definition', 'evidence mapping', 'material or behavior insight']
       : ['portfolio layout', 'visual explanation'],
     canvas: {
-      ratio: '16:9',
+      ratio: variant === 'medical' ? '1800:768' : '16:9',
       orientation: 'landscape'
     },
     structure: {
@@ -149,14 +190,18 @@ const buildTemplateProfile = (stage, elements, sections, variant = 'bigImage') =
       hasSketchArea: stage === 'define'
     },
     strengths: [
-      variant === 'concept' ? 'clear two-column concept and sketch structure' : 'strong full-height visual anchor',
+      variant === 'medical' ? 'three-column long-format research report structure' : variant === 'concept' ? 'clear two-column concept and sketch structure' : 'strong full-height visual anchor',
       stage === 'discover'
-        ? 'supports background research and context explanation'
+        ? variant === 'medical'
+          ? 'supports dense background, research, and interview evidence'
+          : 'supports background research and context explanation'
         : variant === 'concept'
           ? 'supports relationship diagrams and interaction principles'
           : 'supports concept definition and evidence notes',
       stage === 'discover'
-        ? 'supports evidence diagrams or context maps as images'
+        ? variant === 'medical'
+          ? 'supports charts, diagrams, and participant evidence as visual slots'
+          : 'supports evidence diagrams or context maps as images'
         : variant === 'concept'
           ? 'supports step-based design sketch diagrams'
           : 'supports solution/application diagram as image',
@@ -169,12 +214,16 @@ const buildTemplateProfile = (stage, elements, sections, variant = 'bigImage') =
     bestFor: [
       stage === 'discover' ? 'discover pages focused on background research' : 'define pages focused on solution sketches',
       stage === 'discover'
-        ? 'problem context overview with one dominant image'
+        ? variant === 'medical'
+          ? 'long strip canvases with dense research evidence'
+          : 'problem context overview with one dominant image'
         : variant === 'concept'
           ? 'design concept pages with diagrams and step sketches'
           : 'concept exploration with one dominant image',
       stage === 'discover'
-        ? 'evidence mapping and behavior insight'
+        ? variant === 'medical'
+          ? 'data-heavy reports with interviews or user narratives'
+          : 'evidence mapping and behavior insight'
         : variant === 'concept'
           ? 'relationship, mechanism, and interaction principle explanation'
           : 'material experiment or prototype form studies',
@@ -190,13 +239,21 @@ const buildTemplateProfile = (stage, elements, sections, variant = 'bigImage') =
 
 const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
   const sourceElements = Array.isArray(raw.elements) ? raw.elements : [];
-  const variant = sourceFile.toLowerCase().includes('concept') ? 'concept' : 'bigImage';
+  const lowerSource = sourceFile.toLowerCase();
+  const variant = lowerSource.includes('medical') ? 'medical' : lowerSource.includes('concept') ? 'concept' : 'bigImage';
   const elements = sourceElements.map((element, index) => {
     const [slotId, contentSummary] = genericSlotFor(element, index, variant);
     const style = roleToStyle(element, index);
+    const normalizedType = variant === 'medical' && element.type === 'shape'
+      ? 'image'
+      : element.type === 'caption'
+        ? 'caption'
+        : element.type === 'image'
+          ? 'image'
+          : 'text';
     const normalized = {
       slotId,
-      type: element.type === 'caption' ? 'caption' : element.type === 'image' ? 'image' : 'text',
+      type: normalizedType,
       role: element.role || (element.type === 'image' ? 'supporting_image' : 'body_text'),
       x: element.x,
       y: element.y,
@@ -296,16 +353,78 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
       ]
     }
   ];
-  const sections = variant === 'concept' ? conceptSections : bigImageSections;
+  const medicalSections = [
+    {
+      id: 'inspiration_background',
+      label: 'Inspiration & Background',
+      purpose: 'Introduce the research origin, background evidence, and first layer of data visualization.',
+      slots: [
+        'inspiration_title',
+        'inspiration_context_image',
+        'inspiration_body_text',
+        'background_title',
+        'background_summary',
+        'background_map_visual',
+        'background_key_data_a',
+        'background_key_data_b',
+        'background_key_data_c',
+        'background_trend_chart'
+      ]
+    },
+    {
+      id: 'research_challenge',
+      label: 'Research & Challenge',
+      purpose: 'Present research findings, system diagrams, key data points, and challenge synthesis.',
+      slots: [
+        'research_title',
+        'research_intro_text',
+        'research_distribution_visual',
+        'research_distribution_notes',
+        'research_key_percentage',
+        'research_bar_chart',
+        'research_method_text',
+        'challenge_title',
+        'challenge_system_diagram',
+        'challenge_diagram_annotations',
+        'challenge_list_text',
+        'research_conclusion_card'
+      ]
+    },
+    {
+      id: 'interview_insights',
+      label: 'Interview Insights',
+      purpose: 'Show field interviews, participant stories, quotes, avatars, and final research conclusion.',
+      slots: [
+        'interview_title',
+        'interview_intro_text',
+        'interview_question',
+        'participant_1_image',
+        'participant_1_details',
+        'participant_1_quote',
+        'participant_1_avatar',
+        'participant_2_quote',
+        'participant_2_avatar',
+        'participant_3_quote',
+        'participant_3_avatar',
+        'conclusion_title',
+        'conclusion_body_text'
+      ]
+    }
+  ];
+  const sections = variant === 'medical' ? medicalSections : variant === 'concept' ? conceptSections : bigImageSections;
 
   const templateId = stage === 'discover'
-    ? 'discover_long_big_image_16x9'
+    ? variant === 'medical'
+      ? 'discover_long_medical_strip'
+      : 'discover_long_big_image_16x9'
     : variant === 'concept'
       ? 'define_concept_sketch_long_16x9'
       : 'define_solution_sketch_long_16x9';
   const templateProfile = buildTemplateProfile(stage, elements, sections, variant);
   const templateName = stage === 'discover'
-    ? 'Discover Long Big Image Board'
+    ? variant === 'medical'
+      ? 'Discover Long Medical Strip'
+      : 'Discover Long Big Image Board'
     : variant === 'concept'
       ? 'Define Concept Sketch Long Board'
       : 'Define Solution Sketch Long Board';
@@ -317,17 +436,23 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
       pageType: stage,
       doubleDiamondStage: stage,
       layoutPurpose: stage === 'discover'
-        ? 'background_research_context_mapping_and_evidence_sequence'
+        ? variant === 'medical'
+          ? 'long_strip_background_research_data_visualization_and_interview_insights'
+          : 'background_research_context_mapping_and_evidence_sequence'
         : variant === 'concept'
           ? 'design_concept_relationship_diagram_and_solution_sketch_sequence'
         : 'solution_sketch_material_experiment_and_process_mapping',
       narrativeRole: stage === 'discover'
-        ? 'turn_research_context_into_problem_background_and_evidence_logic'
+        ? variant === 'medical'
+          ? 'turn_dense_research_material_into_background_evidence_and_interview_logic'
+          : 'turn_research_context_into_problem_background_and_evidence_logic'
         : variant === 'concept'
           ? 'turn_problem_framing_into_design_concept_and_step_based_sketch_logic'
         : 'turn_problem_definition_into_solution_direction_and_form_exploration',
       suitableFor: stage === 'discover'
-        ? ['discover page', 'background research', 'context mapping', 'evidence diagram', 'process mapping']
+        ? variant === 'medical'
+          ? ['discover page', 'strip canvas', 'background research', 'data visualization', 'interview insights', 'field research']
+          : ['discover page', 'background research', 'context mapping', 'evidence diagram', 'process mapping']
         : variant === 'concept'
           ? ['define page', 'design concept', 'relationship diagram', 'interaction principle', 'design sketch sequence']
         : ['define page', 'solution sketch', 'material experiment', 'application diagram', 'process mapping'],
@@ -335,7 +460,7 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
     },
     templateProfile,
     canvas: {
-      ratio: '16:9',
+      ratio: variant === 'medical' ? '1800:768' : '16:9',
       backgroundColor: raw.canvas?.backgroundColor || '#F8F6EC'
     },
     grid: {
@@ -359,7 +484,9 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
     },
     designSystem: {
       summary: stage === 'discover'
-        ? 'High-density research board with a dominant left hero image, middle context explanation, and right-side evidence or process sequence.'
+        ? variant === 'medical'
+          ? 'High-density long strip research board with three vertical evidence columns for inspiration, research, and interview insights.'
+          : 'High-density research board with a dominant left hero image, middle context explanation, and right-side evidence or process sequence.'
         : variant === 'concept'
           ? 'High-density concept board with left-side conceptual logic and right-side sequential design sketches.'
         : 'High-density portfolio board with a dominant left hero image, middle definition text, and right-side solution sketch or experiment sequence.',
@@ -384,7 +511,9 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
     styleRules: {
       visualDensity: templateProfile.structure.density,
       layoutStyle: stage === 'discover'
-        ? 'discover_long_big_image_board'
+        ? variant === 'medical'
+          ? 'discover_long_medical_strip'
+          : 'discover_long_big_image_board'
         : variant === 'concept'
           ? 'define_concept_sketch_board'
           : 'define_solution_sketch_board',
@@ -393,7 +522,9 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
     },
     aiGenerationRules: {
       mainLogic: stage === 'discover'
-        ? 'Use contentProfile to decide whether this template fits a discover-page research context. Then assign assets to fixed slots only.'
+        ? variant === 'medical'
+          ? 'Use only for discover-stage long strip canvases. Assign dense research text, data visualizations, diagrams, and interview material into fixed slots.'
+          : 'Use contentProfile to decide whether this template fits a discover-page research context. Then assign assets to fixed slots only.'
         : variant === 'concept'
           ? 'Use contentProfile to decide whether this template fits a define-page concept and sketch sequence. Then assign assets to fixed slots only.'
         : 'Use contentProfile to decide whether this template fits a define-page solution sketch. Then assign assets to fixed slots only.',
@@ -411,12 +542,16 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
     layoutVariants: [
       {
         variantId: stage === 'discover'
-          ? 'discover_long_big_image_board'
+          ? variant === 'medical'
+            ? 'discover_long_medical_strip'
+            : 'discover_long_big_image_board'
           : variant === 'concept'
             ? 'define_concept_sketch_long_board'
             : 'define_solution_sketch_long_board',
         layoutLogic: stage === 'discover'
-          ? 'dominant_context_image_plus_research_definition_plus_evidence_and_process_sequence'
+          ? variant === 'medical'
+            ? 'three_column_long_strip_inspiration_research_interview_report'
+            : 'dominant_context_image_plus_research_definition_plus_evidence_and_process_sequence'
           : variant === 'concept'
             ? 'left_concept_relationships_plus_right_step_based_design_sketches'
           : 'dominant_context_image_plus_definition_plus_solution_application_and_experiment_sequence'
@@ -470,6 +605,11 @@ const main = async () => {
   const skipped = [];
 
   for (const fileName of files.filter(file => file.endsWith('.json'))) {
+    if (fileName === 'discover(longsize,bigimage).json') {
+      skipped.push(`${fileName}: replaced by long_medical.json`);
+      continue;
+    }
+
     const filePath = path.join(sourceDir, fileName);
     const sourceText = await readFile(filePath, 'utf8');
     if (!sourceText.trim()) {
