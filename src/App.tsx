@@ -31,6 +31,7 @@ import {
   Scaling,
   Undo2,
   Redo2,
+  RotateCcw,
   Link,
   MousePointer2,
   HelpCircle,
@@ -41,7 +42,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { LayoutBlock, GridSettings } from './types';
 import { analyzeProjectContent } from './utils/analyzeProjectContent';
-import { loadTemplates } from './utils/loadTemplate';
+import { loadAllTemplates } from './utils/loadTemplate';
 import { renderJSONToLayoutBlocks } from './utils/renderElements';
 import { ContentJSON, RenderJSON, TemplateJSON } from './utils/templateTypes';
 
@@ -58,7 +59,7 @@ type SidebarMode = 'generate' | 'edit';
 type PageStage = 'discover' | 'define' | 'develop' | 'deliver';
 type Language = 'zh' | 'en';
 type ReferenceMode = 'template' | 'upload';
-type ImageAssetRole = 'hero' | 'support' | 'texture' | 'reference';
+type ImageAssetRole = 'hero_image' | 'supporting_image' | 'diagram_image' | 'data_visualization' | 'icon_image' | 'background_image' | 'portrait_image' | 'product_image' | 'reference';
 type TextAssetRole = 'title' | 'subtitle' | 'body' | 'caption' | 'label';
 
 type ImageAsset = {
@@ -80,6 +81,16 @@ type TextAsset = {
 const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
 const isTextBlock = (type: LayoutBlock['type']) => TEXT_BLOCK_TYPES.includes(type);
 const createLocalId = () => Math.random().toString(36).slice(2, 10);
+const IMAGE_ROLE_OPTIONS: Array<{ label: string; value: Exclude<ImageAssetRole, 'reference'> }> = [
+  { label: 'HERO', value: 'hero_image' },
+  { label: 'SUPPORT', value: 'supporting_image' },
+  { label: 'DIAGRAM', value: 'diagram_image' },
+  { label: 'CHART', value: 'data_visualization' },
+  { label: 'ICON', value: 'icon_image' },
+  { label: 'BG', value: 'background_image' },
+  { label: 'PERSON', value: 'portrait_image' },
+  { label: 'PRODUCT', value: 'product_image' }
+];
 const isInteractiveTarget = (target: EventTarget | null) => (
   target instanceof HTMLInputElement ||
   target instanceof HTMLTextAreaElement ||
@@ -103,10 +114,9 @@ const CANVAS_PRESETS: Array<{
   { id: 'a4', label: 'A4', viewportLabel: 'A4_PRINT', width: 794, height: 1123, defaultOrientation: 'portrait' },
 ];
 
-const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9', 'deliver_final_outcome_16x9'];
 const STAGE_TEMPLATE_MAP: Record<PageStage, string> = {
-  discover: 'discover_context_mapping_16x9',
-  define: 'auto',
+  discover: 'discover_long_big_image_16x9',
+  define: 'define_concept_sketch_long_16x9',
   develop: 'develop_prototype_demo_16x9',
   deliver: 'deliver_final_outcome_16x9'
 };
@@ -115,6 +125,7 @@ const UI_TEXT = {
   zh: {
     undo: '撤回',
     redo: '重做',
+    reset: '重置',
     viewport: '版面',
     scale: '缩放',
     fit: '适应',
@@ -138,6 +149,7 @@ const UI_TEXT = {
     generate: '生成排版',
     updateWithAI: '用 AI 修改',
     aiEdit: '3. AI 修改',
+    aiEditIntro: '你可以在这里和AI共同修改当前的模版',
     generateInfo: '第一次生成不需要输入提示词。选择参考方式并上传素材后，点击左下方生成排版。',
     aiPlaceholder: '描述希望 AI 修改的方向，例如：让图片更密集、减少文字、突出右侧主视觉...',
     inspector: '参数调整',
@@ -177,6 +189,7 @@ const UI_TEXT = {
   en: {
     undo: 'Undo',
     redo: 'Redo',
+    reset: 'Reset',
     viewport: 'Viewport',
     scale: 'Scale',
     fit: 'Fit',
@@ -200,6 +213,7 @@ const UI_TEXT = {
     generate: 'Generate Layout',
     updateWithAI: 'Update with AI',
     aiEdit: '3. AI Edit',
+    aiEditIntro: 'You can revise the current template together with AI here.',
     generateInfo: 'No prompt is needed for the first generation. Choose a reference mode, upload assets, then use the bottom generate button.',
     aiPlaceholder: 'Describe how AI should revise the layout, e.g. make images denser, reduce text, emphasize the right hero image...',
     inspector: 'Parametric Inspector',
@@ -452,6 +466,18 @@ export default function App() {
     });
   };
 
+  const resetCanvas = () => {
+    setBlocks([]);
+    blocksRef.current = [];
+    setSelectedId(null);
+    setSelectedIds([]);
+    setHistory([]);
+    setFuture([]);
+    setLastRenderJSON(null);
+    setChatMessages([]);
+    setChatInput('');
+  };
+
   const selectOnly = (id: string | null) => {
     setSelectedId(id);
     setSelectedIds(id ? [id] : []);
@@ -486,7 +512,7 @@ export default function App() {
   }, [fitCanvasToViewport]);
 
   useEffect(() => {
-    loadTemplates(TEMPLATE_IDS)
+    loadAllTemplates()
       .then(setAvailableTemplates)
       .catch(error => {
         setChatMessages(prev => [...prev, { role: 'ai', text: `模板加载失败: ${error.message}` }]);
@@ -996,7 +1022,7 @@ export default function App() {
               id: createLocalId(),
               name: file.name.replace(/\.[^.]+$/, ''),
               dataUrl,
-              role: forcedRole || (prev.length === 0 ? 'hero' : 'support'),
+              role: forcedRole || (prev.length === 0 ? 'hero_image' : 'supporting_image'),
               width: image.naturalWidth,
               height: image.naturalHeight
             }
@@ -1031,8 +1057,14 @@ export default function App() {
     const bodyAssets = enabledTextAssets.filter(asset => asset.role === 'body');
     const captionAsset = enabledTextAssets.find(asset => asset.role === 'caption');
     const labelAsset = enabledTextAssets.find(asset => asset.role === 'label');
-    const heroImage = layoutImages.find(asset => asset.role === 'hero') || layoutImages[0];
+    const heroImage = layoutImages.find(asset => asset.role === 'hero_image') || layoutImages[0];
     const supportImages = layoutImages.filter(asset => asset.id !== heroImage?.id);
+    const diagramImage = layoutImages.find(asset => asset.role === 'diagram_image') || supportImages[0];
+    const chartImage = layoutImages.find(asset => asset.role === 'data_visualization') || supportImages[1] || diagramImage;
+    const portraitImage = layoutImages.find(asset => asset.role === 'portrait_image') || supportImages[2] || heroImage;
+    const productImage = layoutImages.find(asset => asset.role === 'product_image') || supportImages[3] || heroImage;
+    const backgroundImage = layoutImages.find(asset => asset.role === 'background_image') || heroImage;
+    const iconImage = layoutImages.find(asset => asset.role === 'icon_image') || supportImages[4] || diagramImage;
     const combinedText = [userMessage, ...enabledTextAssets.map(asset => asset.content)].join('\n');
     const statistic = combinedText.match(/\b\d+(?:\.\d+)?%|\b\d+(?:,\d{3})*(?:\.\d+)?\b/)?.[0];
 
@@ -1077,31 +1109,31 @@ export default function App() {
         image_caption: captionAsset?.content,
         key_statistic: statistic,
         context_visual: heroImage?.id,
-        category_collage_image: heroImage?.id,
-        category_summary_image: supportImages[0]?.id || heroImage?.id,
-        context_visual_a: supportImages[1]?.id || heroImage?.id,
-        context_visual_b: supportImages[2]?.id || supportImages[0]?.id || heroImage?.id,
-        statistic_image_a: supportImages[3]?.id || heroImage?.id,
-        statistic_image_b: supportImages[4]?.id || supportImages[1]?.id || heroImage?.id,
-        statistic_image_c: supportImages[5]?.id || supportImages[2]?.id || heroImage?.id,
-        statistic_image_d: supportImages[6]?.id || supportImages[3]?.id || heroImage?.id,
-        case_image_a: supportImages[7]?.id || supportImages[0]?.id || heroImage?.id,
-        case_image_b: supportImages[8]?.id || supportImages[1]?.id || heroImage?.id,
-        case_image_c: supportImages[9]?.id || supportImages[2]?.id || heroImage?.id,
-        case_image_d: supportImages[10]?.id || supportImages[3]?.id || heroImage?.id,
-        documentary_image_left: supportImages[0]?.id || heroImage?.id,
-        documentary_image_right: supportImages[1]?.id || heroImage?.id,
-        age_0_6_child_image: supportImages[2]?.id || heroImage?.id,
-        age_0_6_curve_diagram: supportImages[3]?.id || supportImages[0]?.id || heroImage?.id,
-        age_6_15_child_image: supportImages[4]?.id || supportImages[1]?.id || heroImage?.id,
-        age_6_15_curve_diagram: supportImages[5]?.id || supportImages[2]?.id || heroImage?.id,
-        age_above_15_child_image: supportImages[6]?.id || supportImages[3]?.id || heroImage?.id,
-        age_above_15_curve_diagram: supportImages[7]?.id || supportImages[4]?.id || heroImage?.id,
-        manifestations_child_image: heroImage?.id,
-        brain_illustration: supportImages[8]?.id || supportImages[0]?.id || heroImage?.id,
-        negative_effect_emotional_group: supportImages[9]?.id || supportImages[1]?.id || heroImage?.id,
-        negative_effect_neurological_group: supportImages[10]?.id || supportImages[2]?.id || heroImage?.id,
-        negative_effect_support_group: supportImages[11]?.id || supportImages[3]?.id || heroImage?.id,
+        category_collage_image: backgroundImage?.id,
+        category_summary_image: diagramImage?.id || heroImage?.id,
+        context_visual_a: portraitImage?.id || heroImage?.id,
+        context_visual_b: productImage?.id || supportImages[0]?.id || heroImage?.id,
+        statistic_image_a: chartImage?.id || heroImage?.id,
+        statistic_image_b: diagramImage?.id || supportImages[1]?.id || heroImage?.id,
+        statistic_image_c: iconImage?.id || supportImages[2]?.id || heroImage?.id,
+        statistic_image_d: supportImages[3]?.id || heroImage?.id,
+        case_image_a: portraitImage?.id || supportImages[0]?.id || heroImage?.id,
+        case_image_b: productImage?.id || supportImages[1]?.id || heroImage?.id,
+        case_image_c: diagramImage?.id || supportImages[2]?.id || heroImage?.id,
+        case_image_d: supportImages[3]?.id || heroImage?.id,
+        documentary_image_left: portraitImage?.id || supportImages[0]?.id || heroImage?.id,
+        documentary_image_right: productImage?.id || supportImages[1]?.id || heroImage?.id,
+        age_0_6_child_image: portraitImage?.id || heroImage?.id,
+        age_0_6_curve_diagram: diagramImage?.id || supportImages[0]?.id || heroImage?.id,
+        age_6_15_child_image: portraitImage?.id || supportImages[1]?.id || heroImage?.id,
+        age_6_15_curve_diagram: chartImage?.id || supportImages[2]?.id || heroImage?.id,
+        age_above_15_child_image: portraitImage?.id || supportImages[3]?.id || heroImage?.id,
+        age_above_15_curve_diagram: diagramImage?.id || supportImages[4]?.id || heroImage?.id,
+        manifestations_child_image: portraitImage?.id || heroImage?.id,
+        brain_illustration: diagramImage?.id || supportImages[0]?.id || heroImage?.id,
+        negative_effect_emotional_group: portraitImage?.id || supportImages[1]?.id || heroImage?.id,
+        negative_effect_neurological_group: diagramImage?.id || supportImages[2]?.id || heroImage?.id,
+        negative_effect_support_group: supportImages[3]?.id || heroImage?.id,
         hero_usage_image: heroImage?.id,
         main_usage_image: heroImage?.id,
         secondary_usage_image: supportImages[0]?.id,
@@ -1301,6 +1333,14 @@ export default function App() {
             >
               <Redo2 size={13} strokeWidth={3} />
               {t.redo}
+            </button>
+            <button
+              onClick={resetCanvas}
+              className="flex items-center gap-1 hover:text-swiss-red transition-colors"
+              title={language === 'zh' ? '重置为空白画布' : 'Reset to blank canvas'}
+            >
+              <RotateCcw size={13} strokeWidth={3} />
+              {t.reset}
             </button>
           </div>
         </div>
@@ -1613,9 +1653,11 @@ export default function App() {
                         className="absolute left-1 bottom-1 max-w-[calc(100%-8px)] bg-white/90 border border-swiss-black/15 text-[8px] font-black uppercase outline-none"
                         title="Image role"
                       >
-                        <option value="hero">hero</option>
-                        <option value="support">support</option>
-                        <option value="texture">texture</option>
+                        {IMAGE_ROLE_OPTIONS.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   ))}
@@ -1700,17 +1742,51 @@ export default function App() {
                 meta={aiLoading ? 'GENERATING' : lastRenderJSON ? 'PROMPT ON' : 'NO PROMPT'}
               >
                 {lastRenderJSON ? (
-                  <textarea
-                    value={chatInput}
-                    onChange={(event) => setChatInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && chatInput.trim() && !aiLoading) {
-                        callGeminiLayout(chatInput.trim());
-                      }
-                    }}
-                    placeholder={t.aiPlaceholder}
-                    className="w-full h-24 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
-                  />
+                  <div className="border border-swiss-black/10 bg-white/70">
+                    <div className="border-b border-swiss-black/10 p-3">
+                      <p className="text-[10px] leading-snug text-swiss-black/55">
+                        {t.aiEditIntro}
+                      </p>
+                    </div>
+                    <div className="max-h-44 overflow-y-auto p-3 space-y-2">
+                      {chatMessages.length === 0 ? (
+                        <div className="border border-dashed border-swiss-black/15 bg-white/50 p-3 text-[10px] leading-snug text-swiss-black/35">
+                          {language === 'zh' ? 'AI 的反馈会显示在这里。' : 'AI feedback will appear here.'}
+                        </div>
+                      ) : (
+                        chatMessages.slice(-5).map((msg, index) => (
+                          <div
+                            key={`${msg.role}-${index}-${msg.text.slice(0, 12)}`}
+                            className={`p-2 text-[10px] leading-snug border ${
+                              msg.role === 'user'
+                                ? 'ml-6 bg-[#111] border-[#111] text-white'
+                                : 'mr-6 bg-swiss-red/10 border-swiss-red/20 text-swiss-black/75'
+                            }`}
+                          >
+                            <span className={`block mb-1 text-[8px] font-black uppercase tracking-widest ${
+                              msg.role === 'user' ? 'text-white/35' : 'text-swiss-red'
+                            }`}>
+                              {msg.role === 'user' ? (language === 'zh' ? '你' : 'You') : 'AI'}
+                            </span>
+                            {msg.text}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="border-t border-swiss-black/10 p-2 bg-white">
+                      <textarea
+                        value={chatInput}
+                        onChange={(event) => setChatInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && chatInput.trim() && !aiLoading) {
+                            callGeminiLayout(chatInput.trim());
+                          }
+                        }}
+                        placeholder={t.aiPlaceholder}
+                        className="w-full h-20 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
+                      />
+                    </div>
+                  </div>
                 ) : (
                   <div className="border border-swiss-black/10 bg-white/60 p-3">
                     <p className="text-[10px] leading-snug text-swiss-black/55">
@@ -1727,23 +1803,6 @@ export default function App() {
                     <p className="mt-1 text-[9px] font-mono text-swiss-black/45 break-all">{lastRenderJSON.templateId}</p>
                   </div>
                 )}
-                <div className="mt-3 space-y-2">
-                  {chatMessages.slice(-3).map((msg, index) => (
-                    <div
-                      key={`${msg.role}-${index}-${msg.text.slice(0, 12)}`}
-                      className={`p-2 text-[10px] leading-snug border ${
-                        msg.role === 'user'
-                          ? 'bg-white/60 border-swiss-black/10 text-swiss-black/55'
-                          : 'bg-swiss-red/10 border-swiss-red/20 text-swiss-black/75'
-                      }`}
-                    >
-                      <span className="block mb-1 text-[8px] font-black uppercase tracking-widest text-swiss-black/35">
-                        {msg.role === 'user' ? 'Prompt' : 'AI'}
-                      </span>
-                      {msg.text}
-                    </div>
-                  ))}
-                </div>
               </CollapsibleSection>
             </>
           ) : (
@@ -2719,7 +2778,7 @@ function GridView({
   if (!showGrid) return null;
   return (
     <div className="absolute inset-0 pointer-events-none select-none">
-      <div className="absolute inset-0 border border-swiss-red/20 opacity-50" style={{ margin: MARGIN - 1 }} />
+      <div className="absolute inset-0 border border-transparent opacity-0" style={{ margin: MARGIN - 1 }} />
       <div 
         className="absolute inset-0 grid"
         style={{ 
@@ -2731,8 +2790,8 @@ function GridView({
       >
         {[...Array(COLUMNS * ROWS)].map((_, i) => (
           <div key={i} className="w-full h-full relative group">
-            <div className="absolute inset-0 border border-swiss-red/10 bg-swiss-red/[0.02]" />
-            <div className="absolute top-0 left-0 right-0 h-[1px] bg-swiss-red/5" />
+            <div className="absolute inset-0 border border-transparent bg-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-[1px] bg-transparent" />
           </div>
         ))}
       </div>
@@ -2748,10 +2807,10 @@ function GridView({
       <div className="absolute bottom-4 right-4">
         <span className="font-mono text-[8px] text-swiss-red/40 font-bold uppercase tracking-widest">Grid System / v2.4</span>
       </div>
-      <div className="absolute top-0 left-0 w-8 h-8 border-t border-l border-swiss-red/30" />
-      <div className="absolute top-0 right-0 w-8 h-8 border-t border-r border-swiss-red/30" />
-      <div className="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-swiss-red/30" />
-      <div className="absolute bottom-0 right-0 w-8 h-8 border-b border-r border-swiss-red/30" />
+      <div className="absolute top-0 left-0 w-8 h-8 border-t border-l border-transparent" />
+      <div className="absolute top-0 right-0 w-8 h-8 border-t border-r border-transparent" />
+      <div className="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-transparent" />
+      <div className="absolute bottom-0 right-0 w-8 h-8 border-b border-r border-transparent" />
     </div>
   );
 }

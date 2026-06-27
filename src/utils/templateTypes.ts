@@ -1,6 +1,6 @@
 import { LayoutBlock } from '../types';
 
-export type TemplateId = 'discover_context_mapping_16x9' | 'develop_prototype_demo_16x9' | 'deliver_final_outcome_16x9';
+export type TemplateId = string;
 
 export type TemplateStage = 'discover' | 'define' | 'develop' | 'deliver';
 
@@ -14,6 +14,7 @@ export type TemplateJSON = {
     narrativeRole: string;
     suitableFor: string[];
   };
+  templateProfile?: TemplateProfile;
   canvas: {
     ratio: string;
   };
@@ -61,6 +62,47 @@ export type TemplateJSON = {
   designSystem?: Record<string, unknown>;
   sections?: Array<Record<string, unknown>>;
   groups?: Array<Record<string, unknown>>;
+};
+
+export type TemplateProfile = {
+  stage: TemplateStage | string;
+  pageIntent: string[];
+  canvas: {
+    ratio: string;
+    orientation?: string;
+  };
+  structure: {
+    sectionCount: number;
+    textSlotCount: number;
+    imageSlotCount: number;
+    chartSlotCount: number;
+    dataPointCount: number;
+    stepCount: number;
+    comparisonCount: number;
+    density: 'low' | 'medium' | 'high' | string;
+    hasHeroImage: boolean;
+    hasBigImage: boolean;
+    hasProcessFlow: boolean;
+    hasSketchArea: boolean;
+  };
+  strengths: string[];
+  risks: string[];
+  bestFor: string[];
+  avoidFor: string[];
+};
+
+export type TemplateManifestItem = {
+  templateId: string;
+  stage: TemplateStage | string;
+  templateName: string;
+  source?: string;
+  profile?: Partial<TemplateProfile>;
+};
+
+export type TemplateManifest = {
+  version: number;
+  generatedAt?: string;
+  templates: TemplateManifestItem[];
 };
 
 export type TextRules = {

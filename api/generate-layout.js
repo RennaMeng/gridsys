@@ -2,9 +2,28 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 
-const TEMPLATE_IDS = ['discover_context_mapping_16x9', 'develop_prototype_demo_16x9', 'deliver_final_outcome_16x9'];
+const DEFAULT_TEMPLATE_IDS = [
+  'discover_context_mapping_16x9',
+  'discover_long_big_image_16x9',
+  'define_concept_sketch_long_16x9',
+  'develop_prototype_demo_16x9',
+  'deliver_final_outcome_16x9'
+];
 const REFERENCE_GRID_WIDTH = 24;
 const REFERENCE_GRID_HEIGHT = 16;
+
+const loadTemplateIds = async () => {
+  try {
+    const manifestPath = path.join(process.cwd(), 'public', 'templates', 'template-manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    const templateIds = Array.isArray(manifest.templates)
+      ? manifest.templates.map(template => template.templateId).filter(Boolean)
+      : [];
+    return templateIds.length ? templateIds : DEFAULT_TEMPLATE_IDS;
+  } catch {
+    return DEFAULT_TEMPLATE_IDS;
+  }
+};
 
 const loadTemplate = async (templateId) => {
   const filePath = path.join(process.cwd(), 'public', 'templates', `${templateId}.json`);
@@ -20,7 +39,9 @@ const analyzeProjectContent = (prompt, textAssets = []) => {
     ? 'deliver'
     : keywordIncludes(text, ['prototype', 'testing', 'function', 'interaction', 'material', 'develop'])
       ? 'develop'
-      : 'discover';
+      : keywordIncludes(text, ['define', 'solution', 'sketch', 'concept', '方案', '草图', '材料', '实验'])
+        ? 'define'
+        : 'discover';
   const contentTypesFound = [
     keywordIncludes(text, ['background', 'context', 'problem', 'why', 'research']) && 'background_summary',
     keywordIncludes(text, ['trend', 'forecast', 'market']) && 'trend_data',
@@ -37,20 +58,158 @@ const analyzeProjectContent = (prompt, textAssets = []) => {
       ? 'final_outcome_and_validation_summary'
       : detectedStage === 'develop'
         ? 'prototype_function_testing'
-        : 'context_research_overview',
+        : detectedStage === 'define'
+          ? 'solution_sketch_and_concept_definition'
+          : 'context_research_overview',
     contentTypesFound
   };
 };
 
-const selectTemplate = (analysis, templates, selectedTemplateId) => {
-  if (selectedTemplateId && selectedTemplateId !== 'auto') {
-    return templates.find(template => template.templateMeta.templateId === selectedTemplateId) || templates[0];
+const countMatches = (text, keywords) => keywords.reduce((count, keyword) => count + (text.includes(keyword) ? 1 : 0), 0);
+
+const buildContentProfile = ({ prompt = '', textAssets = [], imageAssets = [], contentJSON = {}, analysis }) => {
+  const contentText = [
+    prompt,
+    ...textAssets.map(asset => `${asset.title || ''}\n${asset.content || ''}`),
+    JSON.stringify(contentJSON?.content || {})
+  ].join('\n').toLowerCase();
+  const titleCount = textAssets.filter(asset => asset.type === 'title' || /title|heading|标题/.test(`${asset.title || ''} ${asset.content || ''}`.toLowerCase())).length;
+  const bodyCount = textAssets.filter(asset => asset.type !== 'title').length;
+  const chartCount = countMatches(contentText, ['chart', 'diagram', 'graph', '图表', '数据图', 'mapping', 'map']);
+  const dataPointCount = (contentText.match(/\d+(\.\d+)?%|\b\d+(\.\d+)?\b/g) || []).length;
+  const stepCount = countMatches(contentText, ['step', 'process', 'flow', 'stage', 'timeline', '步骤', '流程', '阶段', '实验', 'iteration']);
+  const comparisonCount = countMatches(contentText, ['compare', 'versus', 'vs', 'before', 'after', '对比', '前后']);
+  const density = imageAssets.length + textAssets.length + dataPointCount >= 18
+    ? 'high'
+    : imageAssets.length + textAssets.length >= 8
+      ? 'medium'
+      : 'low';
+
+  return {
+    stage: analysis.detectedStage,
+    pageType: analysis.detectedPageType,
+    counts: {
+      title: Math.max(titleCount, countMatches(contentText, ['title', 'heading', '标题'])),
+      body: bodyCount,
+      image: imageAssets.length,
+      chart: chartCount,
+      dataPoint: dataPointCount,
+      step: stepCount,
+      comparison: comparisonCount
+    },
+    needs: {
+      highImageCapacity: imageAssets.length >= 6,
+      diagramOrChartSlots: chartCount > 0 || dataPointCount >= 3,
+      processOrStepLayout: stepCount > 0,
+      comparisonLayout: comparisonCount > 0,
+      solutionSketchLayout: analysis.detectedStage === 'define' || keywordIncludes(contentText, ['solution', 'sketch', 'concept', '方案', '草图', '实验'])
+    },
+    density,
+    keywords: analysis.contentTypesFound
+  };
+};
+
+const scoreTemplateMatch = (contentProfile, template) => {
+  const profile = template.templateProfile || {};
+  const structure = profile.structure || {};
+  const stage = template.templateMeta?.doubleDiamondStage || template.templateMeta?.pageType || profile.stage;
+  const reasons = [];
+  const risks = [];
+  let score = 0;
+
+  if (stage === contentProfile.stage) {
+    score += 28;
+    reasons.push(`matches ${contentProfile.stage} stage`);
+  } else if (contentProfile.stage === 'discover' && stage === 'define' && contentProfile.needs.solutionSketchLayout) {
+    score += 16;
+    reasons.push('supports early problem-to-solution framing');
+  } else {
+    risks.push(`stage is ${stage}, content looks like ${contentProfile.stage}`);
   }
 
-  return templates.find(template => (
-    template.templateMeta.doubleDiamondStage === analysis.detectedStage ||
-    template.templateMeta.pageType === analysis.detectedStage
-  )) || templates[0];
+  const imageSlots = Number(structure.imageSlotCount ?? (template.elements || []).filter(element => element.type === 'image').length);
+  const textSlots = Number(structure.textSlotCount ?? (template.elements || []).filter(element => element.type !== 'image' && element.type !== 'divider').length);
+  const chartSlots = Number(structure.chartSlotCount ?? (template.elements || []).filter(element => element.type === 'chart').length);
+
+  if (imageSlots >= contentProfile.counts.image) {
+    score += 18;
+    reasons.push('has enough image slots');
+  } else if (imageSlots > 0) {
+    score += Math.max(4, Math.round((imageSlots / Math.max(contentProfile.counts.image, 1)) * 14));
+    risks.push('some uploaded images may be unused or grouped');
+  }
+
+  if (textSlots >= Math.max(1, contentProfile.counts.title + contentProfile.counts.body)) {
+    score += 14;
+    reasons.push('has enough text slots');
+  } else {
+    risks.push('body text may need compression');
+  }
+
+  if (contentProfile.needs.diagramOrChartSlots) {
+    if (chartSlots > 0 || imageSlots >= 4 || /diagram|mapping|chart/i.test(`${profile.pageIntent || ''} ${template.templateMeta?.layoutPurpose || ''}`)) {
+      score += 10;
+      reasons.push('can represent charts or diagrams');
+    } else {
+      risks.push('limited chart or diagram support');
+    }
+  }
+
+  if (contentProfile.needs.processOrStepLayout) {
+    if (structure.hasProcessFlow || Number(structure.stepCount || 0) >= 3) {
+      score += 10;
+      reasons.push('supports process or step sequence');
+    } else {
+      risks.push('process content may need simplification');
+    }
+  }
+
+  if (contentProfile.needs.solutionSketchLayout) {
+    if (structure.hasSketchArea || /solution|sketch|experiment|concept/i.test(`${profile.pageIntent || ''} ${template.templateMeta?.layoutPurpose || ''}`)) {
+      score += 14;
+      reasons.push('supports solution sketch logic');
+    }
+  }
+
+  if (structure.density === contentProfile.density) {
+    score += 6;
+    reasons.push(`matches ${contentProfile.density} information density`);
+  }
+
+  if (structure.hasHeroImage && contentProfile.counts.image > 0) {
+    score += 5;
+    reasons.push('supports a strong hero image');
+  }
+
+  return {
+    templateId: template.templateMeta.templateId,
+    score: Math.max(0, Math.min(100, score)),
+    reason: reasons,
+    risk: risks
+  };
+};
+
+const selectTemplate = (analysis, templates, selectedTemplateId, contentProfile) => {
+  if (selectedTemplateId && selectedTemplateId !== 'auto') {
+    const selected = templates.find(template => template.templateMeta.templateId === selectedTemplateId) || templates[0];
+    const matches = templates
+      .map(template => scoreTemplateMatch(contentProfile, template))
+      .sort((a, b) => b.score - a.score);
+    return { selectedTemplate: selected, matches };
+  }
+
+  const matches = templates
+    .map(template => scoreTemplateMatch(contentProfile, template))
+    .sort((a, b) => b.score - a.score);
+  const selectedId = matches[0]?.templateId;
+  const selectedTemplate = templates.find(template => template.templateMeta.templateId === selectedId)
+    || templates.find(template => (
+      template.templateMeta.doubleDiamondStage === analysis.detectedStage ||
+      template.templateMeta.pageType === analysis.detectedStage
+    ))
+    || templates[0];
+
+  return { selectedTemplate, matches };
 };
 
 const parseDataUrl = (dataUrl = '') => {
@@ -521,15 +680,20 @@ export default async function handler(req, res) {
       contentJSON = {}
     } = body;
 
-    const templates = await Promise.all(TEMPLATE_IDS.map(loadTemplate));
+    const templateIds = await loadTemplateIds();
+    const templates = await Promise.all(templateIds.map(loadTemplate));
     const analysis = analyzeProjectContent(prompt, textAssets);
+    const contentProfile = buildContentProfile({ prompt, textAssets, imageAssets, contentJSON, analysis });
     const hasCustomTemplate = customTemplate && Array.isArray(customTemplate.elements);
     const useUploadedReference = referenceMode === 'upload' && referenceImages.length > 0 && !hasCustomTemplate;
-    const selectedTemplate = hasCustomTemplate
-      ? customTemplate
-      : selectTemplate(analysis, templates, selectedTemplateId);
+    const selection = hasCustomTemplate
+      ? { selectedTemplate: customTemplate, matches: [] }
+      : selectTemplate(analysis, templates, selectedTemplateId, contentProfile);
+    const selectedTemplate = selection.selectedTemplate;
+    const templateMatches = selection.matches.slice(0, 3);
     const selectedTemplateSummary = {
       templateMeta: selectedTemplate.templateMeta,
+      templateProfile: selectedTemplate.templateProfile,
       canvas: selectedTemplate.canvas,
       grid: selectedTemplate.grid,
       contentRequirements: selectedTemplate.contentRequirements,
@@ -548,6 +712,11 @@ export default async function handler(req, res) {
 
 The selected Template JSON owns all layout geometry. The frontend/server will read selectedTemplate.elements to get grid x, y, w, h, type, style, crop, and zIndex. Discover templates use an upgraded 24x16 grid with sections, groups, layoutRules, designSystem, and contentSummary fields.
 Your job is only to decide which supplied content or asset should fill each slot.
+
+You will receive a contentProfile and templateMatches:
+- contentProfile describes the user's content structure: title/body/image/chart/data/step/comparison counts, density, and stage.
+- templateMatches contains the main template and two backup options scored by the server.
+- Use the selectedTemplate as fixed geometry, but respect why it was chosen. If the content is thin, hide optional slots instead of filling them with invented text.
 
 Critical output rule:
 - You must NOT output x, y, w, h, coordinates, sizes, style, crop, zIndex, canvas, or elements.
@@ -696,12 +865,15 @@ Required JSON schema:
     const userContent = {
       userPrompt: prompt,
       analysis,
+      contentProfile,
+      templateMatches,
       selectedTemplate: useUploadedReference ? null : selectedTemplateSummary,
       availableTemplates: useUploadedReference ? [] : templates.map(template => ({
         templateId: template.templateMeta.templateId,
         templateName: template.templateMeta.templateName,
         stage: template.templateMeta.doubleDiamondStage,
-        layoutPurpose: template.templateMeta.layoutPurpose
+        layoutPurpose: template.templateMeta.layoutPurpose,
+        templateProfile: template.templateProfile
       })),
       textAssets,
       imageAssets,
@@ -755,6 +927,7 @@ Required JSON schema:
         referenceTemplate,
         renderJSON: buildTemplatePreviewRenderJSON(referenceTemplate),
         selectedTemplate: referenceTemplate.templateMeta.templateId,
+        contentProfile,
         reasoning: parsed.reasoning || '已根据上传参考图生成临时模板。'
       });
     }
@@ -768,6 +941,8 @@ Required JSON schema:
       renderJSON,
       slotAssignments,
       analysis,
+      contentProfile,
+      templateMatches,
       selectedTemplate: useUploadedReference ? 'uploaded_reference_layout' : selectedTemplate.templateMeta.templateId,
       reasoning: parsed.reasoning || (useUploadedReference ? 'Generated from uploaded reference.' : `Generated from ${selectedTemplate.templateMeta.templateName}.`)
     });

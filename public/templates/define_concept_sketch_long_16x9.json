@@ -1,0 +1,580 @@
+{
+  "templateMeta": {
+    "templateId": "define_concept_sketch_long_16x9",
+    "templateName": "Define Concept Sketch Long Board",
+    "pageType": "define",
+    "doubleDiamondStage": "define",
+    "layoutPurpose": "design_concept_relationship_diagram_and_solution_sketch_sequence",
+    "narrativeRole": "turn_problem_framing_into_design_concept_and_step_based_sketch_logic",
+    "suitableFor": [
+      "define page",
+      "design concept",
+      "relationship diagram",
+      "interaction principle",
+      "design sketch sequence"
+    ],
+    "source": "defineconcept(long).json"
+  },
+  "templateProfile": {
+    "stage": "define",
+    "pageIntent": [
+      "design concept",
+      "relationship diagram",
+      "interaction principle",
+      "system mechanism",
+      "design sketch sequence"
+    ],
+    "canvas": {
+      "ratio": "16:9",
+      "orientation": "landscape"
+    },
+    "structure": {
+      "sectionCount": 2,
+      "textSlotCount": 11,
+      "imageSlotCount": 6,
+      "chartSlotCount": 0,
+      "dataPointCount": 0,
+      "stepCount": 10,
+      "comparisonCount": 0,
+      "density": "medium",
+      "hasHeroImage": false,
+      "hasBigImage": false,
+      "hasProcessFlow": true,
+      "hasSketchArea": true
+    },
+    "strengths": [
+      "clear two-column concept and sketch structure",
+      "supports relationship diagrams and interaction principles",
+      "supports step-based design sketch diagrams",
+      "supports process or experiment sequence"
+    ],
+    "risks": [
+      "many small text slots require concise copy",
+      "best results need enough visual assets for process and experiment slots"
+    ],
+    "bestFor": [
+      "define pages focused on solution sketches",
+      "design concept pages with diagrams and step sketches",
+      "relationship, mechanism, and interaction principle explanation",
+      "process-chain explanation"
+    ],
+    "avoidFor": [
+      "photo-only moodboards with almost no text",
+      "final outcome pages that need validation feedback",
+      "content with very long narrative paragraphs"
+    ]
+  },
+  "canvas": {
+    "ratio": "16:9",
+    "backgroundColor": "#F8F6EC"
+  },
+  "grid": {
+    "type": "strict_grid",
+    "columns": 24,
+    "rows": 16,
+    "columnGap": 0,
+    "rowGap": 0,
+    "margin": 48,
+    "layoutDensity": "medium",
+    "alignment": "modular",
+    "coordinateSystem": "24x16_grid"
+  },
+  "layoutRules": {
+    "density": "medium",
+    "alignToGrid": true,
+    "preserveTemplateGeometry": true,
+    "avoidProjectSpecificCopy": true,
+    "preferredReadingOrder": "left_to_right_with_right_column_iteration_sequence",
+    "imageStrategy": "Use uploaded sketches, diagrams, process photos, and prototype images. Treat charts and diagrams as image assets when needed."
+  },
+  "designSystem": {
+    "summary": "High-density concept board with left-side conceptual logic and right-side sequential design sketches.",
+    "typography": "bold condensed headings, compact body text, small captions",
+    "colorLogic": "neutral board with accent blocks or banners reserved for key insight"
+  },
+  "sections": [
+    {
+      "id": "design_concept",
+      "label": "Design Concept",
+      "purpose": "Explain the conceptual foundation, relationships, principles, and system mechanism.",
+      "slots": [
+        "concept_section_title",
+        "relationship_subtitle",
+        "relationship_diagram",
+        "interaction_principle_subtitle",
+        "interaction_principle_blocks",
+        "system_mechanism_subtitle",
+        "system_mechanism_diagram",
+        "objective_annotation"
+      ]
+    },
+    {
+      "id": "design_sketch",
+      "label": "Design Sketch",
+      "purpose": "Show the proposed design through sequential sketches, diagrams, or process steps.",
+      "slots": [
+        "sketch_section_title",
+        "step_1_title",
+        "step_1_diagram",
+        "step_3_title",
+        "step_3_diagram",
+        "step_2_title",
+        "step_2_diagram",
+        "step_final_title",
+        "step_final_diagram"
+      ]
+    }
+  ],
+  "groups": [],
+  "elements": [
+    {
+      "slotId": "concept_section_title",
+      "type": "text",
+      "role": "title",
+      "x": 0,
+      "y": 0,
+      "w": 10,
+      "h": 1,
+      "style": "title",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Large title for the conceptual foundation section.",
+      "textRules": {
+        "maxChars": 48,
+        "fontSize": 24,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "relationship_subtitle",
+      "type": "text",
+      "role": "title",
+      "x": 0,
+      "y": 1,
+      "w": 10,
+      "h": 0.5,
+      "style": "title",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Subtitle for the relationship or system logic diagram.",
+      "textRules": {
+        "maxChars": 48,
+        "fontSize": 24,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "relationship_diagram",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 0,
+      "y": 2,
+      "w": 10,
+      "h": 3.75,
+      "style": "image",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Diagram image explaining relationships between users, materials, functions, or system parts.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "interaction_principle_subtitle",
+      "type": "text",
+      "role": "title",
+      "x": 0,
+      "y": 6,
+      "w": 10,
+      "h": 0.5,
+      "style": "heading",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Subtitle for the interaction principle section.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "interaction_principle_blocks",
+      "type": "text",
+      "role": "body_text",
+      "x": 0,
+      "y": 6.5,
+      "w": 10,
+      "h": 4,
+      "style": "body",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Compact text block explaining key interaction principles or design mechanisms.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "system_mechanism_subtitle",
+      "type": "text",
+      "role": "title",
+      "x": 0,
+      "y": 10.75,
+      "w": 10,
+      "h": 1.25,
+      "style": "heading",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Subtitle for the circulation, system, or mechanism diagram.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "system_mechanism_diagram",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 0,
+      "y": 11.75,
+      "w": 7,
+      "h": 3.75,
+      "style": "image",
+      "zIndex": 1,
+      "required": true,
+      "contentSummary": "Diagram image showing a system cycle, process loop, or mechanism structure.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "objective_annotation",
+      "type": "text",
+      "role": "annotation",
+      "x": 7,
+      "y": 12,
+      "w": 3,
+      "h": 3.5,
+      "style": "body",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Short objective note explaining the intended design outcome.",
+      "textRules": {
+        "maxChars": 170,
+        "fontSize": 11,
+        "lineClamp": 6,
+        "overflow": "clip",
+        "padding": 8
+      }
+    },
+    {
+      "slotId": "sketch_section_title",
+      "type": "text",
+      "role": "title",
+      "x": 12,
+      "y": 0,
+      "w": 12,
+      "h": 1,
+      "style": "heading",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Large title for the design sketch section.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "step_1_title",
+      "type": "text",
+      "role": "title",
+      "x": 12,
+      "y": 1.5,
+      "w": 7,
+      "h": 1.5,
+      "style": "heading",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Title for the first design sketch or process step.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "step_1_diagram",
+      "type": "image",
+      "role": "hero_image",
+      "x": 12,
+      "y": 3,
+      "w": 7,
+      "h": 4,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Diagram or sketch image for the first step.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "step_3_title",
+      "type": "text",
+      "role": "title",
+      "x": 19.5,
+      "y": 1.5,
+      "w": 4.5,
+      "h": 0.5,
+      "style": "heading",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Title for a branching or parallel design sketch step.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "step_3_diagram",
+      "type": "image",
+      "role": "hero_image",
+      "x": 19.5,
+      "y": 2,
+      "w": 4.5,
+      "h": 4,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Diagram or sketch image for the branching step.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "step_2_title",
+      "type": "text",
+      "role": "title",
+      "x": 12,
+      "y": 7.25,
+      "w": 7,
+      "h": 1.5,
+      "style": "heading",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Title for the second major design sketch or process step.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "step_2_diagram",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 12,
+      "y": 8.5,
+      "w": 7,
+      "h": 7,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Large diagram or sketch image for the second major step.",
+      "crop": "cover"
+    },
+    {
+      "slotId": "step_final_title",
+      "type": "text",
+      "role": "title",
+      "x": 19.5,
+      "y": 6.5,
+      "w": 4.25,
+      "h": 1.25,
+      "style": "heading",
+      "zIndex": 2,
+      "required": true,
+      "contentSummary": "Title for the final system, overall scenario, or summary step.",
+      "textRules": {
+        "maxChars": 42,
+        "fontSize": 15,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 6
+      }
+    },
+    {
+      "slotId": "step_final_diagram",
+      "type": "image",
+      "role": "supporting_image",
+      "x": 19.5,
+      "y": 8.25,
+      "w": 4.5,
+      "h": 7.5,
+      "style": "image",
+      "zIndex": 1,
+      "required": false,
+      "contentSummary": "Final diagram or sketch image summarizing the proposed design system.",
+      "crop": "cover"
+    }
+  ],
+  "contentRequirements": {
+    "required": [
+      "concept_section_title",
+      "relationship_subtitle",
+      "relationship_diagram",
+      "interaction_principle_subtitle",
+      "interaction_principle_blocks",
+      "system_mechanism_subtitle",
+      "system_mechanism_diagram",
+      "objective_annotation",
+      "sketch_section_title",
+      "step_1_title",
+      "step_3_title",
+      "step_2_title",
+      "step_final_title"
+    ],
+    "optional": [
+      "step_1_diagram",
+      "step_3_diagram",
+      "step_2_diagram",
+      "step_final_diagram"
+    ]
+  },
+  "slots": {
+    "textSlots": [
+      {
+        "id": "concept_section_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "relationship_subtitle",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "interaction_principle_subtitle",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "interaction_principle_blocks",
+        "role": "body_text",
+        "required": true
+      },
+      {
+        "id": "system_mechanism_subtitle",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "objective_annotation",
+        "role": "annotation",
+        "required": true
+      },
+      {
+        "id": "sketch_section_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "step_1_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "step_3_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "step_2_title",
+        "role": "title",
+        "required": true
+      },
+      {
+        "id": "step_final_title",
+        "role": "title",
+        "required": true
+      }
+    ],
+    "imageSlots": [
+      {
+        "id": "relationship_diagram",
+        "role": "supporting_image",
+        "required": true,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "system_mechanism_diagram",
+        "role": "supporting_image",
+        "required": true,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "step_1_diagram",
+        "role": "hero_image",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "step_3_diagram",
+        "role": "hero_image",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "step_2_diagram",
+        "role": "supporting_image",
+        "required": false,
+        "cropStyle": "cover"
+      },
+      {
+        "id": "step_final_diagram",
+        "role": "supporting_image",
+        "required": false,
+        "cropStyle": "cover"
+      }
+    ]
+  },
+  "styleRules": {
+    "visualDensity": "medium",
+    "layoutStyle": "define_concept_sketch_board",
+    "textTone": "abstract project logic, no concrete source-project nouns",
+    "preserveStrongLeftHero": true
+  },
+  "aiGenerationRules": {
+    "mainLogic": "Use contentProfile to decide whether this template fits a define-page concept and sketch sequence. Then assign assets to fixed slots only.",
+    "preserveTemplateGeometry": true,
+    "prioritizeUploadedImages": true,
+    "treatDiagramsAndChartsAsImages": true,
+    "abstractSourceTopic": true,
+    "avoid": [
+      "using source JSON project nouns",
+      "inventing coordinates",
+      "turning small captions into long paragraphs",
+      "using this template for final deliverable validation pages"
+    ]
+  },
+  "layoutVariants": [
+    {
+      "variantId": "define_concept_sketch_long_board",
+      "layoutLogic": "left_concept_relationships_plus_right_step_based_design_sketches"
+    }
+  ]
+}

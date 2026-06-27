@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "generatedAt": "2026-06-27T11:31:29.068Z",
+  "templates": [
+    {
+      "templateId": "discover_context_mapping_16x9",
+      "stage": "discover",
+      "templateName": "Discover Reference Mapping"
+    },
+    {
+      "templateId": "define_concept_sketch_long_16x9",
+      "stage": "define",
+      "templateName": "Define Concept Sketch Long Board",
+      "source": "defineconcept(long).json",
+      "profile": {
+        "stage": "define",
+        "pageIntent": [
+          "design concept",
+          "relationship diagram",
+          "interaction principle",
+          "system mechanism",
+          "design sketch sequence"
+        ],
+        "canvas": {
+          "ratio": "16:9",
+          "orientation": "landscape"
+        },
+        "structure": {
+          "sectionCount": 2,
+          "textSlotCount": 11,
+          "imageSlotCount": 6,
+          "chartSlotCount": 0,
+          "dataPointCount": 0,
+          "stepCount": 10,
+          "comparisonCount": 0,
+          "density": "medium",
+          "hasHeroImage": false,
+          "hasBigImage": false,
+          "hasProcessFlow": true,
+          "hasSketchArea": true
+        },
+        "strengths": [
+          "clear two-column concept and sketch structure",
+          "supports relationship diagrams and interaction principles",
+          "supports step-based design sketch diagrams",
+          "supports process or experiment sequence"
+        ],
+        "risks": [
+          "many small text slots require concise copy",
+          "best results need enough visual assets for process and experiment slots"
+        ],
+        "bestFor": [
+          "define pages focused on solution sketches",
+          "design concept pages with diagrams and step sketches",
+          "relationship, mechanism, and interaction principle explanation",
+          "process-chain explanation"
+        ],
+        "avoidFor": [
+          "photo-only moodboards with almost no text",
+          "final outcome pages that need validation feedback",
+          "content with very long narrative paragraphs"
+        ]
+      }
+    },
+    {
+      "templateId": "discover_long_big_image_16x9",
+      "stage": "discover",
+      "templateName": "Discover Long Big Image Board",
+      "source": "discover(longsize,bigimage).json",
+      "profile": {
+        "stage": "discover",
+        "pageIntent": [
+          "background research",
+          "problem discovery",
+          "context definition",
+          "evidence mapping",
+          "material or behavior insight"
+        ],
+        "canvas": {
+          "ratio": "16:9",
+          "orientation": "landscape"
+        },
+        "structure": {
+          "sectionCount": 4,
+          "textSlotCount": 15,
+          "imageSlotCount": 9,
+          "chartSlotCount": 0,
+          "dataPointCount": 7,
+          "stepCount": 16,
+          "comparisonCount": 0,
+          "density": "high",
+          "hasHeroImage": true,
+          "hasBigImage": true,
+          "hasProcessFlow": true,
+          "hasSketchArea": false
+        },
+        "strengths": [
+          "strong full-height visual anchor",
+          "supports background research and context explanation",
+          "supports evidence diagrams or context maps as images",
+          "supports source-to-impact or behavior sequence"
+        ],
+        "risks": [
+          "many small text slots require concise copy",
+          "best results need enough visual assets for process and experiment slots"
+        ],
+        "bestFor": [
+          "discover pages focused on background research",
+          "problem context overview with one dominant image",
+          "evidence mapping and behavior insight",
+          "process-chain explanation"
+        ],
+        "avoidFor": [
+          "photo-only moodboards with almost no text",
+          "final outcome pages that need validation feedback",
+          "content with very long narrative paragraphs"
+        ]
+      }
+    },
+    {
+      "templateId": "develop_prototype_demo_16x9",
+      "stage": "develop",
+      "templateName": "Develop Prototype Demonstration Layout"
+    },
+    {
+      "templateId": "deliver_final_outcome_16x9",
+      "stage": "deliver",
+      "templateName": "Deliver Final Outcome"
+    }
+  ]
+}
