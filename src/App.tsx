@@ -60,6 +60,18 @@ type PageStage = 'discover' | 'define' | 'develop' | 'deliver';
 type Language = 'zh' | 'en';
 type ReferenceMode = 'template' | 'upload';
 type ImageAssetRole = 'hero_image' | 'supporting_image' | 'diagram_image' | 'data_visualization' | 'icon_image' | 'background_image' | 'portrait_image' | 'product_image' | 'reference';
+type AssetVisualType = 'portrait' | 'chart' | 'diagram' | 'product_photo' | 'field_photo' | 'screenshot';
+type AssetInformationDensity = 'high' | 'medium' | 'low';
+type AssetProfile = {
+  visualType: AssetVisualType;
+  informationDensity: AssetInformationDensity;
+  recommendedRole: Exclude<ImageAssetRole, 'reference'>;
+  subject?: string;
+  bestUse?: string;
+  confidence?: number;
+  reasoning?: string;
+  source?: 'local' | 'ai' | 'user';
+};
 type TextAssetRole = 'title' | 'subtitle' | 'body' | 'caption' | 'label';
 
 type ImageAsset = {
@@ -69,6 +81,7 @@ type ImageAsset = {
   role: ImageAssetRole;
   width?: number;
   height?: number;
+  assetProfile?: AssetProfile;
 };
 
 type TextAsset = {
@@ -76,6 +89,12 @@ type TextAsset = {
   label: string;
   content: string;
   role: TextAssetRole;
+};
+
+type LayoutPreviewState = {
+  prompt: string;
+  templateId: string;
+  referenceMode: ReferenceMode;
 };
 
 const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
@@ -91,6 +110,53 @@ const IMAGE_ROLE_OPTIONS: Array<{ label: string; value: Exclude<ImageAssetRole, 
   { label: 'PERSON', value: 'portrait_image' },
   { label: 'PRODUCT', value: 'product_image' }
 ];
+const ASSET_VISUAL_TYPE_OPTIONS: Array<{ label: string; value: AssetVisualType }> = [
+  { label: 'PORTRAIT', value: 'portrait' },
+  { label: 'CHART', value: 'chart' },
+  { label: 'DIAGRAM', value: 'diagram' },
+  { label: 'PRODUCT', value: 'product_photo' },
+  { label: 'FIELD', value: 'field_photo' },
+  { label: 'SCREEN', value: 'screenshot' }
+];
+const ASSET_DENSITY_OPTIONS: Array<{ label: string; value: AssetInformationDensity }> = [
+  { label: 'HIGH', value: 'high' },
+  { label: 'MED', value: 'medium' },
+  { label: 'LOW', value: 'low' }
+];
+const VISUAL_TYPE_ROLE_MAP: Record<AssetVisualType, Exclude<ImageAssetRole, 'reference'>> = {
+  portrait: 'portrait_image',
+  chart: 'data_visualization',
+  diagram: 'diagram_image',
+  product_photo: 'product_image',
+  field_photo: 'supporting_image',
+  screenshot: 'supporting_image'
+};
+const LOCAL_ASSET_PROFILE_COPY: Record<AssetVisualType, { subject: string; bestUse: string }> = {
+  portrait: {
+    subject: 'Possible person or user-context image.',
+    bestUse: 'Interview, participant, user story, or case slot.'
+  },
+  chart: {
+    subject: 'Possible data visualization or chart.',
+    bestUse: 'Research evidence, statistic, or data slot.'
+  },
+  diagram: {
+    subject: 'Possible diagram, map, or process visual.',
+    bestUse: 'System, process, method, or mapping slot.'
+  },
+  product_photo: {
+    subject: 'Possible product, prototype, model, or material detail.',
+    bestUse: 'Prototype, component, outcome, or detail slot.'
+  },
+  field_photo: {
+    subject: 'Possible field, context, or supporting photo.',
+    bestUse: 'Hero, context, evidence, or supporting visual slot.'
+  },
+  screenshot: {
+    subject: 'Possible interface screenshot or dense screen capture.',
+    bestUse: 'UI evidence, process, testing, or medium supporting slot.'
+  }
+};
 const isInteractiveTarget = (target: EventTarget | null) => (
   target instanceof HTMLInputElement ||
   target instanceof HTMLTextAreaElement ||
@@ -99,6 +165,62 @@ const isInteractiveTarget = (target: EventTarget | null) => (
   target instanceof HTMLAnchorElement ||
   (target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, button, a, [contenteditable="true"]')))
 );
+
+const inferLocalAssetProfile = (
+  fileName: string,
+  width?: number,
+  height?: number,
+  fallbackRole: Exclude<ImageAssetRole, 'reference'> = 'supporting_image'
+): AssetProfile => {
+  const name = fileName.toLowerCase();
+  const aspectRatio = width && height ? width / height : 1;
+  const visualType: AssetVisualType = /chart|graph|data|stat|plot|table|数据|图表/.test(name)
+    ? 'chart'
+    : /diagram|map|flow|wireframe|schema|mapping|地图|流程|结构/.test(name)
+      ? 'diagram'
+      : /portrait|person|user|interview|avatar|人物|访谈|用户/.test(name)
+        ? 'portrait'
+        : /product|prototype|model|mockup|产品|原型|模型/.test(name)
+          ? 'product_photo'
+          : /screen|screenshot|ui|界面|截图/.test(name)
+            ? 'screenshot'
+            : 'field_photo';
+  const informationDensity: AssetInformationDensity = visualType === 'chart' || visualType === 'diagram' || visualType === 'screenshot'
+    ? 'high'
+    : aspectRatio > 1.8 || aspectRatio < 0.65
+      ? 'medium'
+      : 'low';
+
+  return {
+    visualType,
+    informationDensity,
+    recommendedRole: VISUAL_TYPE_ROLE_MAP[visualType] || fallbackRole,
+    subject: LOCAL_ASSET_PROFILE_COPY[visualType].subject,
+    bestUse: LOCAL_ASSET_PROFILE_COPY[visualType].bestUse,
+    confidence: 0.45,
+    reasoning: 'Local filename and aspect-ratio estimate before AI analysis.',
+    source: 'local'
+  };
+};
+
+const createImagePreviewDataUrl = (dataUrl: string, maxSide = 512): Promise<string> => new Promise((resolve) => {
+  const image = new Image();
+  image.onload = () => {
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) {
+      resolve(dataUrl);
+      return;
+    }
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    resolve(canvas.toDataURL('image/jpeg', 0.72));
+  };
+  image.onerror = () => resolve(dataUrl);
+  image.src = dataUrl;
+});
 
 const CANVAS_PRESETS: Array<{
   id: CanvasPresetId;
@@ -375,6 +497,8 @@ export default function App() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>(getDefaultTemplateForStage('discover', 'digital-16-9'));
   const [uploadedReferenceTemplate, setUploadedReferenceTemplate] = useState<TemplateJSON | null>(null);
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
+  const [pendingLayoutPreview, setPendingLayoutPreview] = useState<LayoutPreviewState | null>(null);
+  const [assetAnalysisPendingIds, setAssetAnalysisPendingIds] = useState<string[]>([]);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
   const [pageStage, setPageStage] = useState<PageStage>('discover');
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>('template');
@@ -480,6 +604,7 @@ export default function App() {
     setHistory([]);
     setFuture([]);
     setLastRenderJSON(null);
+    setPendingLayoutPreview(null);
     setChatMessages([]);
     setChatInput('');
   };
@@ -1017,30 +1142,145 @@ export default function App() {
     setZoom(prev => Math.min(Math.max(prev + delta, 0.4), 1.5));
   };
 
+  const analyzeImageAssetsWithAI = async (assets: ImageAsset[]) => {
+    const analyzableAssets = assets.filter(asset => asset.role !== 'reference');
+    if (!analyzableAssets.length) return;
+    const analyzingIds = analyzableAssets.map(asset => asset.id);
+    setAssetAnalysisPendingIds(prev => Array.from(new Set([...prev, ...analyzingIds])));
+
+    try {
+      const previewAssets = await Promise.all(analyzableAssets.map(async asset => ({
+        id: asset.id,
+        name: asset.name,
+        role: asset.role,
+        width: asset.width,
+        height: asset.height,
+        assetProfile: asset.assetProfile,
+        dataUrl: await createImagePreviewDataUrl(asset.dataUrl)
+      })));
+      const response = await fetch('/api/generate-layout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'analyze-assets',
+          imageAssets: previewAssets
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Asset analysis failed.');
+      }
+      const profileMap = new Map<string, AssetProfile>(
+        (result.assetProfiles || []).map((profile: AssetProfile & { assetId: string }) => [
+          profile.assetId,
+          {
+            visualType: profile.visualType,
+            informationDensity: profile.informationDensity,
+            recommendedRole: profile.recommendedRole,
+            subject: profile.subject,
+            bestUse: profile.bestUse,
+            confidence: profile.confidence,
+            reasoning: profile.reasoning,
+            source: 'ai'
+          }
+        ])
+      );
+      setImageAssets(prev => prev.map(asset => {
+        const profile = profileMap.get(asset.id);
+        if (!profile) return asset;
+        return {
+          ...asset,
+          assetProfile: profile,
+          role: asset.role === 'supporting_image' || asset.assetProfile?.source === 'local'
+            ? profile.recommendedRole
+            : asset.role
+        };
+      }));
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, {
+        role: 'ai',
+        text: language === 'zh'
+          ? `图片理解暂时不可用，已使用本地初始标签继续：${err.message}`
+          : `Image understanding is unavailable for now. Local asset profiles will be used: ${err.message}`
+      }]);
+    } finally {
+      setAssetAnalysisPendingIds(prev => prev.filter(id => !analyzingIds.includes(id)));
+    }
+  };
+
+  const readImageAsset = (
+    file: File,
+    indexInBatch: number,
+    forcedRole?: ImageAssetRole
+  ): Promise<ImageAsset> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const image = new Image();
+      image.onload = () => {
+        const fallbackRole = forcedRole || (imageAssets.length + indexInBatch === 0 ? 'hero_image' : 'supporting_image');
+        const assetProfile = forcedRole === 'reference'
+          ? undefined
+          : inferLocalAssetProfile(file.name, image.naturalWidth, image.naturalHeight, fallbackRole as Exclude<ImageAssetRole, 'reference'>);
+        resolve({
+          id: createLocalId(),
+          name: file.name.replace(/\.[^.]+$/, ''),
+          dataUrl,
+          role: forcedRole || assetProfile?.recommendedRole || fallbackRole,
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+          assetProfile
+        });
+      };
+      image.onerror = () => reject(new Error(`Failed to read image: ${file.name}`));
+      image.src = dataUrl;
+    };
+    reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+
   const handleImageAssetUpload = (files: FileList | File[], forcedRole?: ImageAssetRole) => {
     const nextFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    nextFiles.slice(0, Math.max(0, 24 - imageAssets.length)).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        const image = new Image();
-        image.onload = () => {
-          setImageAssets(prev => [
-            ...prev,
-            {
-              id: createLocalId(),
-              name: file.name.replace(/\.[^.]+$/, ''),
-              dataUrl,
-              role: forcedRole || (prev.length === 0 ? 'hero_image' : 'supporting_image'),
-              width: image.naturalWidth,
-              height: image.naturalHeight
-            }
-          ]);
-        };
-        image.src = dataUrl;
+    const limitedFiles = nextFiles.slice(0, Math.max(0, 24 - imageAssets.length));
+    void Promise.all(limitedFiles.map((file, index) => readImageAsset(file, index, forcedRole)))
+      .then(nextAssets => {
+        setImageAssets(prev => [...prev, ...nextAssets]);
+        if (!forcedRole) {
+          void analyzeImageAssetsWithAI(nextAssets);
+        }
+      })
+      .catch((err: Error) => {
+        setChatMessages(prev => [...prev, {
+          role: 'ai',
+          text: language === 'zh' ? `图片读取失败：${err.message}` : `Image upload failed: ${err.message}`
+        }]);
+      });
+  };
+
+  const updateAssetProfile = (assetId: string, updates: Partial<AssetProfile>) => {
+    setImageAssets(prev => prev.map(asset => {
+      if (asset.id !== assetId) return asset;
+      const currentProfile = asset.assetProfile || inferLocalAssetProfile(asset.name, asset.width, asset.height, asset.role === 'reference' ? 'supporting_image' : asset.role);
+      const visualType = updates.visualType || currentProfile.visualType;
+      const recommendedRole = updates.recommendedRole || (
+        updates.visualType ? VISUAL_TYPE_ROLE_MAP[visualType] : currentProfile.recommendedRole
+      );
+      const nextProfile: AssetProfile = {
+        ...currentProfile,
+        ...updates,
+        visualType,
+        recommendedRole,
+        source: 'ai'
       };
-      reader.readAsDataURL(file);
-    });
+
+      return {
+        ...asset,
+        role: asset.role === 'reference' ? asset.role : recommendedRole,
+        assetProfile: nextProfile
+      };
+    }));
   };
 
   const addTextAsset = () => {
@@ -1176,6 +1416,49 @@ export default function App() {
     })
   });
 
+  const buildTemplatePreviewRenderJSON = (template: TemplateJSON): RenderJSON => ({
+    templateId: `${template.templateMeta.templateId}_preview`,
+    canvas: {
+      width: template.grid.columns,
+      height: template.grid.rows
+    },
+    elements: (template.elements || []).map((element, index) => {
+      const isImageSlot = element.type === 'image';
+      const slotUse = element.contentSummary || element.role || element.slotId;
+      return {
+        type: isImageSlot ? 'caption' : element.type,
+        id: `preview_${element.slotId}`,
+        x: element.x,
+        y: element.y,
+        w: element.w,
+        h: element.h,
+        style: isImageSlot ? 'caption' : element.style,
+        crop: element.crop,
+        zIndex: element.zIndex || index + 1,
+        content: isImageSlot
+          ? `${language === 'zh' ? '图片槽位' : 'Image slot'}\n${element.role}\n${slotUse}`
+          : (element.contentSummary || element.role || element.slotId),
+        textRules: {
+          maxChars: isImageSlot ? 120 : element.textRules?.maxChars || 90,
+          fontSize: isImageSlot ? 9 : element.textRules?.fontSize || 11,
+          lineClamp: isImageSlot ? 5 : element.textRules?.lineClamp || 3,
+          overflow: 'clip',
+          padding: isImageSlot ? 6 : element.textRules?.padding || 6
+        }
+      };
+    })
+  });
+
+  const getPreviewTemplate = () => {
+    if (referenceMode === 'upload') return uploadedReferenceTemplate;
+    const fallbackTemplateId = selectedTemplateId === 'auto'
+      ? getDefaultTemplateForStage(pageStage, canvasPresetId)
+      : selectedTemplateId;
+    return availableTemplates.find(template => template.templateMeta.templateId === fallbackTemplateId)
+      || availableTemplates.find(template => template.templateMeta.doubleDiamondStage === pageStage)
+      || availableTemplates[0];
+  };
+
   const generateUploadedReferenceTemplate = async () => {
     const referenceImageAssets = imageAssets.filter(asset => asset.role === 'reference');
     if (!referenceImageAssets.length) {
@@ -1218,6 +1501,7 @@ export default function App() {
 
       rememberBlocks();
       setUploadedReferenceTemplate(result.referenceTemplate);
+      setPendingLayoutPreview(null);
       setLastRenderJSON(result.renderJSON);
       setBlocks(renderJSONToLayoutBlocks(result.renderJSON));
       selectOnly(null);
@@ -1234,7 +1518,32 @@ export default function App() {
     }
   };
 
-  const callGeminiLayout = async (userMessage: string) => {
+  const showTemplatePreviewBeforeLayout = (userMessage: string) => {
+    const template = getPreviewTemplate();
+    if (!template) {
+      throw new Error(language === 'zh' ? '模板还没有加载完成，请稍后再试。' : 'Templates are still loading.');
+    }
+
+    const previewRenderJSON = buildTemplatePreviewRenderJSON(template);
+    rememberBlocks();
+    setLayoutMode('editorial');
+    setLastRenderJSON(previewRenderJSON);
+    setPendingLayoutPreview({
+      prompt: userMessage,
+      templateId: template.templateMeta.templateId,
+      referenceMode
+    });
+    setBlocks(renderJSONToLayoutBlocks(previewRenderJSON));
+    selectOnly(null);
+    setChatMessages(prev => [...prev, {
+      role: 'ai',
+      text: language === 'zh'
+        ? `已先展示模板骨架：${template.templateMeta.templateName}。请检查槽位逻辑，确认后再完成最终排版。未匹配图片的槽位会先用文字说明需要的素材。`
+        : `Template structure previewed: ${template.templateMeta.templateName}. Review the slot logic first, then confirm the final layout. Unmatched image slots are labeled with the needed asset type.`
+    }]);
+  };
+
+  const callGeminiLayout = async (userMessage: string, confirmedFinalLayout = false) => {
     setAiLoading(true);
     setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setChatInput('');
@@ -1242,6 +1551,21 @@ export default function App() {
     try {
       if (!availableTemplates.length) {
         throw new Error('模板还没有加载完成，请稍后再试。');
+      }
+
+      if (!confirmedFinalLayout && pendingLayoutPreview) {
+        setChatMessages(prev => [...prev, {
+          role: 'ai',
+          text: language === 'zh'
+            ? '请先使用画板下方的确认按钮完成最终排版。'
+            : 'Use the confirmation button below the canvas to complete the final layout.'
+        }]);
+        return;
+      }
+
+      if (!confirmedFinalLayout && !lastRenderJSON) {
+        showTemplatePreviewBeforeLayout(userMessage);
+        return;
       }
 
       const analysis = analyzeProjectContent(userMessage);
@@ -1276,7 +1600,8 @@ export default function App() {
             name: asset.name,
             role: asset.role,
             width: asset.width,
-            height: asset.height
+            height: asset.height,
+            assetProfile: asset.assetProfile
           })),
           referenceImages: referenceImageAssets.map(asset => ({
             id: asset.id,
@@ -1301,6 +1626,7 @@ export default function App() {
       rememberBlocks();
       setLayoutMode('editorial');
       setLastRenderJSON(renderJSON);
+      setPendingLayoutPreview(null);
       setBlocks(newBlocks);
       selectOnly(null);
       setChatMessages(prev => [...prev, {
@@ -1645,33 +1971,105 @@ export default function App() {
                   <Upload size={13} />
                   {t.uploadImages}
                 </button>
-                <div className="grid grid-cols-3 gap-2 mt-3">
-                  {imageAssets.filter(asset => asset.role !== 'reference').map(asset => (
-                    <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
-                      <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
-                      <button
-                        onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
-                        className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                        title={language === 'zh' ? '移除图片' : 'Remove image'}
-                      >
-                        <X size={12} />
-                      </button>
-                      <select
-                        value={asset.role}
-                        onChange={(event) => setImageAssets(prev => prev.map(item => (
-                          item.id === asset.id ? { ...item, role: event.target.value as ImageAssetRole } : item
-                        )))}
-                        className="absolute left-1 bottom-1 max-w-[calc(100%-8px)] bg-white/90 border border-swiss-black/15 text-[8px] font-black uppercase outline-none"
-                        title="Image role"
-                      >
-                        {IMAGE_ROLE_OPTIONS.map(option => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                <div className="mt-3 space-y-2">
+                  {imageAssets.filter(asset => asset.role !== 'reference').map(asset => {
+                    const profile = asset.assetProfile || inferLocalAssetProfile(asset.name, asset.width, asset.height, asset.role === 'reference' ? 'supporting_image' : asset.role);
+                    const isAnalyzing = assetAnalysisPendingIds.includes(asset.id);
+                    const confidence = profile.confidence === undefined ? null : Math.round(profile.confidence * 100);
+
+                    return (
+                      <div key={asset.id} className="group border border-swiss-black/10 bg-white/70 p-2">
+                        <div className="flex gap-2">
+                          <div className="relative shrink-0">
+                            <img src={asset.dataUrl} alt={asset.name} className="h-16 w-16 object-cover border border-swiss-black/10" />
+                            <button
+                              onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                              className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              title={language === 'zh' ? '移除图片' : 'Remove image'}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-[9px] font-black uppercase tracking-widest text-swiss-black/65">{asset.name}</p>
+                                <p className="mt-0.5 text-[8px] font-bold uppercase tracking-widest text-swiss-black/35">
+                                  {isAnalyzing
+                                    ? (language === 'zh' ? 'AI 理解中' : 'AI reading')
+                                    : `${profile.source === 'ai' ? 'AI' : 'LOCAL'}${confidence === null ? '' : ` ${confidence}%`}`}
+                                </p>
+                              </div>
+                              <span className={`shrink-0 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest ${
+                                profile.informationDensity === 'high'
+                                  ? 'bg-swiss-red text-white'
+                                  : 'bg-swiss-black/5 text-swiss-black/45'
+                              }`}>
+                                {profile.informationDensity}
+                              </span>
+                            </div>
+
+                            <div className="mt-2 grid grid-cols-3 gap-1">
+                              <select
+                                value={profile.visualType}
+                                onChange={(event) => updateAssetProfile(asset.id, { visualType: event.target.value as AssetVisualType })}
+                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
+                                title={language === 'zh' ? 'AI 判断的图片类型' : 'AI visual type'}
+                              >
+                                {ASSET_VISUAL_TYPE_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={profile.informationDensity}
+                                onChange={(event) => updateAssetProfile(asset.id, { informationDensity: event.target.value as AssetInformationDensity })}
+                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
+                                title={language === 'zh' ? '信息密度' : 'Information density'}
+                              >
+                                {ASSET_DENSITY_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={profile.recommendedRole}
+                                onChange={(event) => updateAssetProfile(asset.id, { recommendedRole: event.target.value as Exclude<ImageAssetRole, 'reference'> })}
+                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
+                                title={language === 'zh' ? '推荐角色' : 'Recommended role'}
+                              >
+                                {IMAGE_ROLE_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="mt-1 space-y-0.5 text-[8px] leading-snug text-swiss-black/40">
+                              {profile.subject && (
+                                <p className="line-clamp-1">
+                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '内容' : 'Subject'}:</span> {profile.subject}
+                                </p>
+                              )}
+                              {profile.bestUse && (
+                                <p className="line-clamp-1">
+                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '适合' : 'Use'}:</span> {profile.bestUse}
+                                </p>
+                              )}
+                              {profile.reasoning && (
+                                <p className="line-clamp-1">
+                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '理由' : 'Why'}:</span> {profile.reasoning}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-4 border-t border-swiss-black/10 pt-3">
@@ -1887,7 +2285,9 @@ export default function App() {
             }
             className="w-full h-11 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
           >
-            {lastRenderJSON ? t.updateWithAI : t.generate}
+            {pendingLayoutPreview
+              ? (language === 'zh' ? '请在画板下方确认' : 'Confirm Below Canvas')
+              : lastRenderJSON ? t.updateWithAI : t.generate}
           </button>
         </div>
       </aside>
@@ -2157,6 +2557,42 @@ export default function App() {
             </div>
           </div>
         </div>
+        {pendingLayoutPreview && (
+          <div className="fixed left-[324px] right-[284px] bottom-5 z-[80] border border-swiss-black/10 bg-white/90 backdrop-blur shadow-xl p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-swiss-red">
+                  {language === 'zh' ? '模板骨架待确认' : 'Template Preview Ready'}
+                </p>
+                <p className="mt-1 truncate text-[10px] leading-snug text-swiss-black/55">
+                  {language === 'zh'
+                    ? '请先检查槽位逻辑。确认后 AI 才会分配图片和文字生成最终排版。'
+                    : 'Review the slot logic first. AI will assign images and text only after confirmation.'}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => {
+                    setPendingLayoutPreview(null);
+                    setLastRenderJSON(null);
+                  }}
+                  className="h-9 px-3 border border-swiss-black/10 bg-white text-[9px] font-black uppercase tracking-widest text-swiss-black/45 hover:border-swiss-red hover:text-swiss-red transition-colors"
+                >
+                  {language === 'zh' ? '继续调整' : 'Keep Editing'}
+                </button>
+                <button
+                  onClick={() => callGeminiLayout(pendingLayoutPreview.prompt, true)}
+                  disabled={aiLoading}
+                  className="h-9 px-4 bg-swiss-red text-white text-[9px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
+                >
+                  {aiLoading
+                    ? (language === 'zh' ? '生成中...' : 'Generating...')
+                    : (language === 'zh' ? '确认并完成排版' : 'Confirm Final Layout')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Sidebar Right: Inspector */}

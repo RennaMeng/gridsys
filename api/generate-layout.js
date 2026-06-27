@@ -11,6 +11,18 @@ const DEFAULT_TEMPLATE_IDS = [
 ];
 const REFERENCE_GRID_WIDTH = 24;
 const REFERENCE_GRID_HEIGHT = 16;
+const ASSET_VISUAL_TYPES = new Set(['portrait', 'chart', 'diagram', 'product_photo', 'field_photo', 'screenshot']);
+const ASSET_DENSITIES = new Set(['high', 'medium', 'low']);
+const ASSET_ROLES = new Set(['hero_image', 'supporting_image', 'diagram_image', 'data_visualization', 'icon_image', 'background_image', 'portrait_image', 'product_image']);
+
+const VISUAL_TYPE_TO_ROLE = {
+  portrait: 'portrait_image',
+  chart: 'data_visualization',
+  diagram: 'diagram_image',
+  product_photo: 'product_image',
+  field_photo: 'supporting_image',
+  screenshot: 'supporting_image'
+};
 
 const loadTemplateIds = async () => {
   try {
@@ -75,7 +87,11 @@ const buildContentProfile = ({ prompt = '', textAssets = [], imageAssets = [], c
   ].join('\n').toLowerCase();
   const titleCount = textAssets.filter(asset => asset.type === 'title' || /title|heading|标题/.test(`${asset.title || ''} ${asset.content || ''}`.toLowerCase())).length;
   const bodyCount = textAssets.filter(asset => asset.type !== 'title').length;
-  const chartCount = countMatches(contentText, ['chart', 'diagram', 'graph', '图表', '数据图', 'mapping', 'map']);
+  const profiledChartCount = imageAssets.filter(asset => {
+    const profile = asset.assetProfile || {};
+    return profile.visualType === 'chart' || profile.visualType === 'diagram' || profile.recommendedRole === 'data_visualization' || profile.recommendedRole === 'diagram_image';
+  }).length;
+  const chartCount = countMatches(contentText, ['chart', 'diagram', 'graph', '图表', '数据图', 'mapping', 'map']) + profiledChartCount;
   const dataPointCount = (contentText.match(/\d+(\.\d+)?%|\b\d+(\.\d+)?\b/g) || []).length;
   const stepCount = countMatches(contentText, ['step', 'process', 'flow', 'stage', 'timeline', '步骤', '流程', '阶段', '实验', 'iteration']);
   const comparisonCount = countMatches(contentText, ['compare', 'versus', 'vs', 'before', 'after', '对比', '前后']);
@@ -243,6 +259,61 @@ const parseDataUrl = (dataUrl = '') => {
   };
 };
 
+const normalizeAssetProfiles = (rawProfiles = [], imageAssets = []) => {
+  const validAssetIds = new Set(imageAssets.map(asset => asset.id));
+  const existingProfiles = new Map(imageAssets.map(asset => [asset.id, asset.assetProfile || {}]));
+  return (Array.isArray(rawProfiles) ? rawProfiles : [])
+    .filter(profile => validAssetIds.has(profile.assetId))
+    .map(profile => {
+      const visualType = ASSET_VISUAL_TYPES.has(profile.visualType)
+        ? profile.visualType
+        : existingProfiles.get(profile.assetId)?.visualType || 'field_photo';
+      const recommendedRole = ASSET_ROLES.has(profile.recommendedRole)
+        ? profile.recommendedRole
+        : VISUAL_TYPE_TO_ROLE[visualType] || 'supporting_image';
+      const informationDensity = ASSET_DENSITIES.has(profile.informationDensity)
+        ? profile.informationDensity
+        : existingProfiles.get(profile.assetId)?.informationDensity || 'medium';
+      const confidence = Number(profile.confidence);
+
+      return {
+        assetId: String(profile.assetId),
+        visualType,
+        informationDensity,
+        recommendedRole,
+        subject: String(profile.subject || existingProfiles.get(profile.assetId)?.subject || '').slice(0, 120),
+        bestUse: String(profile.bestUse || existingProfiles.get(profile.assetId)?.bestUse || '').slice(0, 140),
+        confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.65,
+        reasoning: String(profile.reasoning || 'Image profile inferred by AI.').slice(0, 180)
+      };
+    });
+};
+
+const buildLocalAssetProfile = (asset) => {
+  const name = String(asset.name || '').toLowerCase();
+  const visualType = /chart|graph|data|stat|plot|table|数据|图表/.test(name)
+    ? 'chart'
+    : /diagram|map|flow|wireframe|schema|mapping|地图|流程|结构/.test(name)
+      ? 'diagram'
+      : /portrait|person|user|interview|avatar|人物|访谈|用户/.test(name)
+        ? 'portrait'
+        : /product|prototype|model|mockup|产品|原型|模型/.test(name)
+          ? 'product_photo'
+          : /screen|screenshot|ui|界面|截图/.test(name)
+            ? 'screenshot'
+            : 'field_photo';
+
+  return {
+    visualType,
+    informationDensity: visualType === 'chart' || visualType === 'diagram' || visualType === 'screenshot' ? 'high' : 'low',
+    recommendedRole: VISUAL_TYPE_TO_ROLE[visualType] || asset.role || 'supporting_image',
+    subject: `${visualType.replace('_', ' ')} inferred from file name.`,
+    bestUse: 'Use according to the recommended role when matching template slots.',
+    confidence: 0.4,
+    reasoning: 'Local filename fallback.'
+  };
+};
+
 const normalizeSlotAssignments = (raw, template) => {
   const validSlotIds = new Set((template.elements || []).map(element => element.slotId));
   const assignments = Array.isArray(raw.slotAssignments) ? raw.slotAssignments : [];
@@ -308,39 +379,57 @@ const fallbackContentForSlot = (slotId, contentJSON) => {
 
 const fallbackAssetForSlot = (slotId, contentJSON, imageAssets) => {
   const content = contentJSON?.content || {};
+  const matchAsset = (...predicates) => {
+    for (const predicate of predicates) {
+      const found = imageAssets.find(asset => predicate(asset, asset.assetProfile || buildLocalAssetProfile(asset)));
+      if (found) return found.id;
+    }
+    return undefined;
+  };
+  const chartOrDiagramAsset = matchAsset(
+    (asset, profile) => profile.recommendedRole === 'data_visualization' || profile.visualType === 'chart',
+    (asset, profile) => profile.recommendedRole === 'diagram_image' || profile.visualType === 'diagram'
+  );
+  const portraitAsset = matchAsset((asset, profile) => profile.recommendedRole === 'portrait_image' || profile.visualType === 'portrait');
+  const productAsset = matchAsset((asset, profile) => profile.recommendedRole === 'product_image' || profile.visualType === 'product_photo');
+  const heroAsset = matchAsset(
+    (asset, profile) => profile.recommendedRole === 'hero_image' && profile.informationDensity !== 'high',
+    (asset, profile) => profile.visualType === 'field_photo' && profile.informationDensity !== 'high'
+  );
+  const supportingAsset = matchAsset((asset, profile) => profile.recommendedRole === 'supporting_image');
   const fallbackMap = {
-    documentary_image_left: imageAssets[0]?.id,
-    documentary_image_right: imageAssets[1]?.id || imageAssets[0]?.id,
-    age_0_6_child_image: imageAssets[2]?.id || imageAssets[0]?.id,
-    age_0_6_curve_diagram: imageAssets[3]?.id || imageAssets[1]?.id || imageAssets[0]?.id,
-    age_6_15_child_image: imageAssets[4]?.id || imageAssets[2]?.id || imageAssets[0]?.id,
-    age_6_15_curve_diagram: imageAssets[5]?.id || imageAssets[3]?.id || imageAssets[1]?.id,
-    age_above_15_child_image: imageAssets[6]?.id || imageAssets[4]?.id || imageAssets[0]?.id,
-    age_above_15_curve_diagram: imageAssets[7]?.id || imageAssets[5]?.id || imageAssets[1]?.id,
-    manifestations_child_image: imageAssets[8]?.id || imageAssets[0]?.id,
-    brain_illustration: imageAssets[9]?.id || imageAssets[2]?.id || imageAssets[0]?.id,
-    negative_effect_emotional_group: imageAssets[10]?.id || imageAssets[3]?.id || imageAssets[0]?.id,
-    negative_effect_neurological_group: imageAssets[11]?.id || imageAssets[4]?.id || imageAssets[1]?.id,
-    negative_effect_support_group: imageAssets[12]?.id || imageAssets[5]?.id || imageAssets[2]?.id,
+    documentary_image_left: portraitAsset || heroAsset || imageAssets[0]?.id,
+    documentary_image_right: productAsset || supportingAsset || imageAssets[1]?.id || imageAssets[0]?.id,
+    age_0_6_child_image: portraitAsset || imageAssets[2]?.id || imageAssets[0]?.id,
+    age_0_6_curve_diagram: chartOrDiagramAsset || imageAssets[3]?.id || imageAssets[1]?.id || imageAssets[0]?.id,
+    age_6_15_child_image: portraitAsset || imageAssets[4]?.id || imageAssets[2]?.id || imageAssets[0]?.id,
+    age_6_15_curve_diagram: chartOrDiagramAsset || imageAssets[5]?.id || imageAssets[3]?.id || imageAssets[1]?.id,
+    age_above_15_child_image: portraitAsset || imageAssets[6]?.id || imageAssets[4]?.id || imageAssets[0]?.id,
+    age_above_15_curve_diagram: chartOrDiagramAsset || imageAssets[7]?.id || imageAssets[5]?.id || imageAssets[1]?.id,
+    manifestations_child_image: portraitAsset || imageAssets[8]?.id || imageAssets[0]?.id,
+    brain_illustration: chartOrDiagramAsset || imageAssets[9]?.id || imageAssets[2]?.id || imageAssets[0]?.id,
+    negative_effect_emotional_group: portraitAsset || imageAssets[10]?.id || imageAssets[3]?.id || imageAssets[0]?.id,
+    negative_effect_neurological_group: chartOrDiagramAsset || imageAssets[11]?.id || imageAssets[4]?.id || imageAssets[1]?.id,
+    negative_effect_support_group: supportingAsset || imageAssets[12]?.id || imageAssets[5]?.id || imageAssets[2]?.id,
     context_visual: content.context_visual,
-    category_collage_image: content.category_collage_image || imageAssets[0]?.id,
-    category_summary_image: content.category_summary_image || imageAssets[1]?.id || imageAssets[0]?.id,
-    context_visual_a: content.context_visual_a || imageAssets[2]?.id || content.context_visual || imageAssets[0]?.id,
-    context_visual_b: content.context_visual_b || imageAssets[3]?.id || imageAssets[1]?.id || content.context_visual,
-    statistic_image_a: content.statistic_image_a || imageAssets[4]?.id || imageAssets[0]?.id,
-    statistic_image_b: content.statistic_image_b || imageAssets[5]?.id || imageAssets[1]?.id,
-    statistic_image_c: content.statistic_image_c || imageAssets[6]?.id || imageAssets[2]?.id,
-    statistic_image_d: content.statistic_image_d || imageAssets[7]?.id || imageAssets[3]?.id,
-    case_image_a: content.case_image_a || imageAssets[8]?.id || imageAssets[2]?.id,
-    case_image_b: content.case_image_b || imageAssets[9]?.id || imageAssets[3]?.id,
-    case_image_c: content.case_image_c || imageAssets[10]?.id || imageAssets[4]?.id,
-    case_image_d: content.case_image_d || imageAssets[11]?.id || imageAssets[5]?.id,
-    hero_usage_image: content.hero_usage_image || content.main_usage_image,
-    secondary_usage_image: content.secondary_usage_image,
-    component_image: content.component_image,
-    material_detail_image: content.material_detail_image,
-    hero_outcome_image: content.hero_outcome_image || content.hero_usage_image || content.main_usage_image,
-    component_spread_image: content.component_spread_image || content.component_image,
+    category_collage_image: content.category_collage_image || supportingAsset || imageAssets[0]?.id,
+    category_summary_image: content.category_summary_image || chartOrDiagramAsset || imageAssets[1]?.id || imageAssets[0]?.id,
+    context_visual_a: content.context_visual_a || portraitAsset || imageAssets[2]?.id || content.context_visual || imageAssets[0]?.id,
+    context_visual_b: content.context_visual_b || productAsset || imageAssets[3]?.id || imageAssets[1]?.id || content.context_visual,
+    statistic_image_a: content.statistic_image_a || chartOrDiagramAsset || imageAssets[4]?.id || imageAssets[0]?.id,
+    statistic_image_b: content.statistic_image_b || chartOrDiagramAsset || imageAssets[5]?.id || imageAssets[1]?.id,
+    statistic_image_c: content.statistic_image_c || chartOrDiagramAsset || imageAssets[6]?.id || imageAssets[2]?.id,
+    statistic_image_d: content.statistic_image_d || chartOrDiagramAsset || imageAssets[7]?.id || imageAssets[3]?.id,
+    case_image_a: content.case_image_a || portraitAsset || imageAssets[8]?.id || imageAssets[2]?.id,
+    case_image_b: content.case_image_b || productAsset || imageAssets[9]?.id || imageAssets[3]?.id,
+    case_image_c: content.case_image_c || chartOrDiagramAsset || imageAssets[10]?.id || imageAssets[4]?.id,
+    case_image_d: content.case_image_d || supportingAsset || imageAssets[11]?.id || imageAssets[5]?.id,
+    hero_usage_image: content.hero_usage_image || content.main_usage_image || heroAsset,
+    secondary_usage_image: content.secondary_usage_image || supportingAsset,
+    component_image: content.component_image || productAsset,
+    material_detail_image: content.material_detail_image || productAsset || supportingAsset,
+    hero_outcome_image: content.hero_outcome_image || content.hero_usage_image || content.main_usage_image || heroAsset,
+    component_spread_image: content.component_spread_image || content.component_image || productAsset,
     testing_image_a: content.testing_image_a || content.secondary_usage_image,
     testing_image_b: content.testing_image_b || content.material_detail_image,
     scenario_image_foot: content.scenario_image_foot || content.secondary_usage_image,
@@ -352,7 +441,7 @@ const fallbackAssetForSlot = (slotId, contentJSON, imageAssets) => {
     diagram_overlay_image: content.diagram_overlay_image || content.module_card_arm
   };
 
-  return fallbackMap[slotId] || imageAssets[0]?.id;
+  return fallbackMap[slotId] || heroAsset || supportingAsset || chartOrDiagramAsset || imageAssets[0]?.id;
 };
 
 const fitTextToRule = (value, textRules) => {
@@ -736,6 +825,106 @@ export default async function handler(req, res) {
       contentJSON = {}
     } = body;
 
+    if (action === 'analyze-assets') {
+      const assetsForAnalysis = imageAssets
+        .filter(asset => asset?.id && asset?.dataUrl)
+        .slice(0, 24);
+      if (!assetsForAnalysis.length) {
+        return res.status(200).json({ assetProfiles: [] });
+      }
+
+      const assetAnalysisInstruction = `You are an image asset analyst for a portfolio layout generator.
+
+Classify each uploaded image so the layout system can assign images to fixed template slots.
+
+Allowed visualType values:
+- portrait
+- chart
+- diagram
+- product_photo
+- field_photo
+- screenshot
+
+Allowed informationDensity values:
+- high
+- medium
+- low
+
+Allowed recommendedRole values:
+- hero_image
+- supporting_image
+- diagram_image
+- data_visualization
+- icon_image
+- background_image
+- portrait_image
+- product_image
+
+Return only valid JSON. No markdown.
+
+Required schema:
+{
+  "assetProfiles": [
+    {
+      "assetId": "asset id from input",
+      "visualType": "portrait | chart | diagram | product_photo | field_photo | screenshot",
+      "informationDensity": "high | medium | low",
+      "recommendedRole": "one allowed role",
+      "subject": "what the image appears to contain, max 16 words",
+      "bestUse": "where this image should be used in a portfolio layout, max 18 words",
+      "confidence": 0.0,
+      "reasoning": "short reason, max 20 words"
+    }
+  ]
+}
+
+Guidance:
+- Charts, maps, tables, dashboards, and numeric infographics should usually become data_visualization.
+- System drawings, process flows, wireframes, and explanatory illustrations should usually become diagram_image.
+- Clear human faces or interview photos should become portrait_image.
+- Product, prototype, model, component, or material-detail photos should become product_image.
+- Clean low-density field photos can become hero_image; dense screenshots should not.
+- subject should describe visible content, not just repeat the visualType.
+- bestUse should explain the preferred layout use, such as hero, research evidence, diagram slot, interview card, product detail, or medium support slot.
+- Do not invent factual content.`;
+
+      const assetText = assetsForAnalysis.map(asset => ({
+        id: asset.id,
+        name: asset.name,
+        currentRole: asset.role,
+        width: asset.width,
+        height: asset.height,
+        localProfile: asset.assetProfile
+      }));
+      const assetParts = assetsForAnalysis
+        .map(asset => {
+          const parsed = parseDataUrl(asset.dataUrl);
+          return parsed
+            ? {
+              inlineData: {
+                mimeType: parsed.mimeType,
+                data: parsed.data
+              }
+            }
+            : null;
+        })
+        .filter(Boolean);
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [{ role: 'user', parts: [{ text: JSON.stringify({ imageAssets: assetText }) }, ...assetParts] }],
+        config: {
+          systemInstruction: assetAnalysisInstruction,
+          temperature: 0.2,
+          responseMimeType: 'application/json'
+        }
+      });
+      const parsed = JSON.parse((response.text || '{}').replace(/```json|```/g, '').trim());
+      const normalizedProfiles = normalizeAssetProfiles(parsed.assetProfiles, assetsForAnalysis);
+
+      return res.status(200).json({ assetProfiles: normalizedProfiles });
+    }
+
     const templateIds = await loadTemplateIds();
     const templates = await Promise.all(templateIds.map(loadTemplate));
     const analysis = analyzeProjectContent(prompt, textAssets);
@@ -772,6 +961,7 @@ Your job is only to decide which supplied content or asset should fill each slot
 You will receive a contentProfile and templateMatches:
 - contentProfile describes the user's content structure: title/body/image/chart/data/step/comparison counts, density, and stage.
 - templateMatches contains the main template and two backup options scored by the server.
+- imageAssets may include assetProfile with visualType, informationDensity, recommendedRole, confidence, and reasoning.
 - Use the selectedTemplate as fixed geometry, but respect why it was chosen. If the content is thin, hide optional slots instead of filling them with invented text.
 
 Critical output rule:
@@ -798,6 +988,10 @@ Required JSON schema:
 Slot assignment rules:
 - slotId must exactly match one of selectedTemplate.elements[].slotId.
 - For image slots, use assetId from imageAssets. Do not invent external URLs.
+- Prefer imageAssets whose assetProfile.recommendedRole or visualType matches the slot role and contentSummary.
+- Put high-density chart, diagram, screenshot, and infographic images into data, diagram, evidence, or medium visual slots instead of large hero slots.
+- Prefer low-density field photos, product photos, or clear context images for hero and large visual anchor slots.
+- Prefer portrait images for interview, participant, user, and case slots.
 - For text, caption, and annotation slots, write concise content based only on userPrompt, textAssets, and contentJSON.
 - Follow each selectedTemplate.elements[].textRules exactly when present. Never exceed maxChars.
 - For chart slots, use value and label. If no data exists, mark visible false unless the slot is required.

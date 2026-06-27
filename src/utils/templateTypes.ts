@@ -43,6 +43,7 @@ export type TemplateJSON = {
     zIndex?: number;
     required?: boolean;
     textRules?: TextRules;
+    contentSummary?: string;
   }>;
   contentRequirements: {
     required: string[];
