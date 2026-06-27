@@ -330,6 +330,60 @@ const normalizeSlotAssignments = (raw, template) => {
     }));
 };
 
+const normalizePreviewPlan = (rawPlan = [], template) => {
+  const validSlotIds = new Set((template.elements || []).map(element => element.slotId));
+  return (Array.isArray(rawPlan) ? rawPlan : [])
+    .filter(item => validSlotIds.has(item.slotId))
+    .map(item => ({
+      slotId: String(item.slotId),
+      x: clampNumber(item.x, 0, REFERENCE_GRID_WIDTH - 1, 0),
+      y: clampNumber(item.y, 0, REFERENCE_GRID_HEIGHT - 1, 0),
+      w: clampNumber(item.w, 1, REFERENCE_GRID_WIDTH, 4),
+      h: clampNumber(item.h, 1, REFERENCE_GRID_HEIGHT, 2),
+      note: String(item.note || '').replace(/\s+/g, ' ').trim().slice(0, 180),
+      fontSize: item.fontSize === undefined ? undefined : clampNumber(item.fontSize, 7, 36, undefined),
+      lineClamp: item.lineClamp === undefined ? undefined : clampNumber(item.lineClamp, 1, 8, undefined)
+    }));
+};
+
+const applyPreviewPlanToTemplate = (template, rawPlan = []) => {
+  const previewPlan = normalizePreviewPlan(rawPlan, template);
+  if (!previewPlan.length) return { template, previewPlan };
+
+  const planMap = new Map(previewPlan.map(item => [item.slotId, item]));
+  return {
+    previewPlan,
+    template: {
+      ...template,
+      elements: (template.elements || []).map(element => {
+        const plan = planMap.get(element.slotId);
+        if (!plan) return element;
+        const x = clampNumber(plan.x, 0, REFERENCE_GRID_WIDTH - 1, element.x);
+        const y = clampNumber(plan.y, 0, REFERENCE_GRID_HEIGHT - 1, element.y);
+        const w = clampNumber(plan.w, 1, REFERENCE_GRID_WIDTH - x, element.w);
+        const h = clampNumber(plan.h, 1, REFERENCE_GRID_HEIGHT - y, element.h);
+        const textRules = element.type === 'image' || element.type === 'divider'
+          ? element.textRules
+          : {
+            ...(element.textRules || {}),
+            ...(plan.fontSize ? { fontSize: plan.fontSize } : {}),
+            ...(plan.lineClamp ? { lineClamp: plan.lineClamp } : {})
+          };
+
+        return {
+          ...element,
+          x,
+          y,
+          w,
+          h,
+          ...(plan.note ? { contentSummary: plan.note } : {}),
+          ...(textRules ? { textRules } : {})
+        };
+      })
+    }
+  };
+};
+
 const fallbackContentForSlot = (slotId, contentJSON) => {
   const content = contentJSON?.content || {};
   const fallbackMap = {
@@ -819,6 +873,7 @@ export default async function handler(req, res) {
       referenceMode = 'template',
       action = 'generate-layout',
       customTemplate = null,
+      previewPlan = [],
       textAssets = [],
       imageAssets = [],
       referenceImages = [],
@@ -934,7 +989,7 @@ Guidance:
     const selection = hasCustomTemplate
       ? { selectedTemplate: customTemplate, matches: [] }
       : selectTemplate(analysis, templates, selectedTemplateId, contentProfile);
-    const selectedTemplate = selection.selectedTemplate;
+    const { template: selectedTemplate, previewPlan: normalizedPreviewPlan } = applyPreviewPlanToTemplate(selection.selectedTemplate, previewPlan);
     const templateMatches = selection.matches.slice(0, 3);
     const selectedTemplateSummary = {
       templateMeta: selectedTemplate.templateMeta,
@@ -962,6 +1017,7 @@ You will receive a contentProfile and templateMatches:
 - contentProfile describes the user's content structure: title/body/image/chart/data/step/comparison counts, density, and stage.
 - templateMatches contains the main template and two backup options scored by the server.
 - imageAssets may include assetProfile with visualType, informationDensity, recommendedRole, confidence, and reasoning.
+- previewPlan may include user-confirmed slot notes and edited positions from the preview canvas. The server has already applied its geometry to selectedTemplate.elements.
 - Use the selectedTemplate as fixed geometry, but respect why it was chosen. If the content is thin, hide optional slots instead of filling them with invented text.
 
 Critical output rule:
@@ -989,6 +1045,7 @@ Slot assignment rules:
 - slotId must exactly match one of selectedTemplate.elements[].slotId.
 - For image slots, use assetId from imageAssets. Do not invent external URLs.
 - Prefer imageAssets whose assetProfile.recommendedRole or visualType matches the slot role and contentSummary.
+- Treat selectedTemplate.elements[].contentSummary as the user-confirmed slot intention when it came from previewPlan.
 - Put high-density chart, diagram, screenshot, and infographic images into data, diagram, evidence, or medium visual slots instead of large hero slots.
 - Prefer low-density field photos, product photos, or clear context images for hero and large visual anchor slots.
 - Prefer portrait images for interview, participant, user, and case slots.
@@ -1127,6 +1184,7 @@ Required JSON schema:
       analysis,
       contentProfile,
       templateMatches,
+      previewPlan: normalizedPreviewPlan,
       canvasPresetId,
       selectedTemplate: useUploadedReference ? null : selectedTemplateSummary,
       availableTemplates: useUploadedReference ? [] : templates.map(template => ({
@@ -1204,6 +1262,7 @@ Required JSON schema:
       analysis,
       contentProfile,
       templateMatches,
+      previewPlan: normalizedPreviewPlan,
       selectedTemplate: useUploadedReference ? 'uploaded_reference_layout' : selectedTemplate.templateMeta.templateId,
       reasoning: parsed.reasoning || (useUploadedReference ? 'Generated from uploaded reference.' : `Generated from ${selectedTemplate.templateMeta.templateName}.`)
     });

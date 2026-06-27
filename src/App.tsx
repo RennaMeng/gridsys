@@ -97,6 +97,18 @@ type LayoutPreviewState = {
   referenceMode: ReferenceMode;
 };
 
+type PreviewPlanItem = {
+  slotId: string;
+  type: LayoutBlock['type'];
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  note: string;
+  fontSize?: number;
+  lineClamp?: number;
+};
+
 const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
 const isTextBlock = (type: LayoutBlock['type']) => TEXT_BLOCK_TYPES.includes(type);
 const createLocalId = () => Math.random().toString(36).slice(2, 10);
@@ -1444,29 +1456,42 @@ export default function App() {
   });
 
   const buildTemplatePreviewRenderJSON = (template: TemplateJSON, userMessage: string): RenderJSON => {
-    const enabledTextAssets = textAssetsEnabled ? textAssets : [];
-    const firstPromptLine = userMessage.split('\n').find(line => line.trim())?.trim();
-    const titleText = enabledTextAssets.find(asset => asset.role === 'title')?.content || firstPromptLine || (language === 'zh' ? '生成后的页面标题' : 'Generated page title');
-    const subtitleText = enabledTextAssets.find(asset => asset.role === 'subtitle')?.content || (language === 'zh' ? '生成后的章节说明' : 'Generated section context');
-    const bodyText = enabledTextAssets.find(asset => asset.role === 'body')?.content || userMessage || (language === 'zh' ? '生成后的正文摘要会放在这里。' : 'Generated body summary will appear here.');
-    const captionText = enabledTextAssets.find(asset => asset.role === 'caption')?.content || (language === 'zh' ? '生成后的图片说明。' : 'Generated image caption.');
-    const labelText = enabledTextAssets.find(asset => asset.role === 'label')?.content || (language === 'zh' ? '生成后的信息标签' : 'Generated label');
+    void userMessage;
     const imageRoleLabel = (role: string) => {
-      if (/portrait|participant|user|interview/i.test(role)) return language === 'zh' ? '人物 / 用户 / 访谈照片' : 'portrait, user, or interview photo';
-      if (/chart|data|stat|diagram|map|visualization/i.test(role)) return language === 'zh' ? '图表 / 数据 / 结构图' : 'chart, data, or diagram image';
-      if (/product|prototype|component|material|outcome/i.test(role)) return language === 'zh' ? '产品 / 原型 / 组件照片' : 'product, prototype, or component photo';
-      if (/hero|background|context/i.test(role)) return language === 'zh' ? '清晰主视觉或背景图' : 'clear hero or context image';
+      if (/portrait|participant|user|interview/i.test(role)) return language === 'zh' ? '人物、用户或访谈照片' : 'portrait, user, or interview photo';
+      if (/chart|data|stat|visualization/i.test(role)) return language === 'zh' ? '数据图表、统计图或信息图' : 'chart, statistic, or infographic';
+      if (/diagram|map|flow|system|process/i.test(role)) return language === 'zh' ? '结构图、流程图或系统图' : 'diagram, map, or process visual';
+      if (/product|prototype|component|material|outcome/i.test(role)) return language === 'zh' ? '产品、原型、组件或材料照片' : 'product, prototype, component, or material photo';
+      if (/hero|background|context/i.test(role)) return language === 'zh' ? '清晰主视觉、场景图或背景图' : 'clear hero, context, or background image';
       return language === 'zh' ? '与该槽位语义匹配的图片' : 'image matching this slot intent';
     };
+    const textSlotLabel = (element: NonNullable<TemplateJSON['elements']>[number], index: number) => {
+      const role = `${element.role} ${element.slotId} ${element.style || ''}`.toLowerCase();
+      if (element.style === 'title' || /title|headline|hero/.test(role)) {
+        return language === 'zh' ? '页面主标题：概括本页调研主题或核心问题' : 'Page title: summarize the research topic or core question';
+      }
+      if (element.style === 'heading' || /heading|section|subtitle/.test(role)) {
+        return language === 'zh' ? '章节标题：标注这一组信息的调研维度' : 'Section heading: name this research dimension';
+      }
+      if (element.type === 'caption' || /caption|note|annotation|label/.test(role)) {
+        return language === 'zh' ? '说明文字：解释图片、数据或关键发现' : 'Caption: explain the image, data, or key finding';
+      }
+      if (/question|hmw|opportunity/.test(role)) {
+        return language === 'zh' ? '机会点文本：放设计问题、洞察或 How Might We' : 'Opportunity text: design question, insight, or HMW';
+      }
+      if (/data|stat|evidence|finding/.test(role)) {
+        return language === 'zh' ? '证据文本：放调研数据、发现或论据摘要' : 'Evidence text: research data, finding, or proof summary';
+      }
+      if (/user|participant|interview/.test(role)) {
+        return language === 'zh' ? '用户文本：放用户画像、访谈摘录或行为洞察' : 'User text: persona, interview quote, or behavior insight';
+      }
+      return language === 'zh' ? `正文文本 ${index + 1}：放调研背景、分析或结论摘要` : `Body text ${index + 1}: research background, analysis, or conclusion summary`;
+    };
     const generatedTextForSlot = (element: NonNullable<TemplateJSON['elements']>[number], index: number) => {
-      const role = `${element.role} ${element.slotId}`.toLowerCase();
       if (element.type === 'image') {
         return `${language === 'zh' ? '图片槽位' : 'Image slot'}\n${imageRoleLabel(element.role)}\n${language === 'zh' ? '不匹配可留空或稍后替换' : 'Leave blank if no matching asset exists'}`;
       }
-      if (element.style === 'title' || /title|hero|headline/.test(role)) return titleText;
-      if (element.style === 'heading' || /heading|section|subtitle/.test(role)) return index % 2 === 0 ? subtitleText : labelText;
-      if (element.type === 'caption' || /caption|note|annotation|label/.test(role)) return captionText || labelText;
-      return bodyText;
+      return textSlotLabel(element, index);
     };
 
     return {
@@ -1489,11 +1514,11 @@ export default function App() {
         zIndex: element.zIndex || index + 1,
         content: generatedTextForSlot(element, index),
         textRules: {
-          maxChars: isImageSlot ? 120 : element.textRules?.maxChars || 90,
-          fontSize: isImageSlot ? 9 : element.textRules?.fontSize || 11,
-          lineClamp: isImageSlot ? 5 : element.textRules?.lineClamp || 3,
+          maxChars: isImageSlot ? 72 : 72,
+          fontSize: isImageSlot ? 8 : Math.min(element.textRules?.fontSize || 10, 10),
+          lineClamp: isImageSlot ? 4 : 3,
           overflow: 'clip',
-          padding: isImageSlot ? 6 : element.textRules?.padding || 6
+          padding: isImageSlot ? 4 : 5
         }
       };
     })
@@ -1509,6 +1534,23 @@ export default function App() {
       || availableTemplates.find(template => template.templateMeta.doubleDiamondStage === pageStage)
       || availableTemplates[0];
   };
+
+  const buildPreviewPlanFromBlocks = (): PreviewPlanItem[] => blocks.reduce<PreviewPlanItem[]>((plan, block) => {
+      const match = block.id.match(/^preview_(.+)-\d+$/);
+      if (!match) return plan;
+      plan.push({
+        slotId: match[1],
+        type: block.type,
+        x: block.x,
+        y: block.y,
+        w: block.w,
+        h: block.h,
+        note: block.label,
+        fontSize: block.fontSize,
+        lineClamp: block.lineClamp
+      });
+      return plan;
+    }, []);
 
   const generateUploadedReferenceTemplate = async () => {
     const referenceImageAssets = imageAssets.filter(asset => asset.role === 'reference');
@@ -1636,10 +1678,11 @@ export default function App() {
         },
         body: JSON.stringify({
           prompt: userMessage,
-          selectedTemplateId,
+          selectedTemplateId: confirmedFinalLayout && pendingLayoutPreview ? pendingLayoutPreview.templateId : selectedTemplateId,
           canvasPresetId,
           referenceMode,
           customTemplate: useOwnReference ? uploadedReferenceTemplate : undefined,
+          previewPlan: confirmedFinalLayout && pendingLayoutPreview ? buildPreviewPlanFromBlocks() : undefined,
           contentJSON,
           textAssets: (textAssetsEnabled ? textAssets : []).map(asset => ({
             id: asset.id,
