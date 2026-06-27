@@ -2790,7 +2790,7 @@ function GridView({
       >
         {[...Array(COLUMNS * ROWS)].map((_, i) => (
           <div key={i} className="w-full h-full relative group">
-            <div className="absolute inset-0 border border-transparent bg-swiss-red/[0.02]" />
+            <div className="absolute inset-[1px] border border-transparent bg-swiss-red/[0.025]" />
             <div className="absolute top-0 left-0 right-0 h-[1px] bg-transparent" />
           </div>
         ))}
