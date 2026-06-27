@@ -15,6 +15,26 @@ const blockType = (element: RenderElement): LayoutBlock['type'] => {
   return 'container';
 };
 
+const fitTextStyle = (label: string, w: number, h: number, baseFontSize: number, requestedClamp?: number) => {
+  const availableCells = Math.max(1, w * h);
+  const charCount = label.replace(/\s+/g, '').length;
+  const density = charCount / availableCells;
+  const fittedFontSize = density > 18
+    ? baseFontSize * 0.58
+    : density > 12
+      ? baseFontSize * 0.7
+      : density > 8
+        ? baseFontSize * 0.82
+        : baseFontSize;
+  const maxLinesByHeight = Math.max(1, Math.floor((h * 1.65) / Math.max(0.8, fittedFontSize / 12)));
+  const lineClamp = Math.min(requestedClamp || maxLinesByHeight, maxLinesByHeight);
+
+  return {
+    fontSize: Math.max(7, Math.round(fittedFontSize)),
+    lineClamp
+  };
+};
+
 export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] {
   return renderJSON.elements.map((element, index) => {
     const x = clamp(toGrid(element.x, renderJSON.canvas.width, EDITOR_COLUMNS), 0, EDITOR_COLUMNS - 1);
@@ -25,15 +45,18 @@ export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] 
     const isText = type === 'text' || type === 'heading' || type === 'title';
     const textRules = element.textRules;
     const fallbackFontSize = element.style === 'title' ? 28 : element.style === 'heading' ? 18 : element.type === 'chart' ? 26 : 12;
+    const label = element.type === 'chart'
+      ? `${element.value || '--'}\n${element.label || 'Chart placeholder'}`
+      : element.type === 'divider'
+        ? 'DIVIDER'
+        : element.content || element.label || element.id;
+    const baseFontSize = textRules?.fontSize || fallbackFontSize;
+    const fittedText = isText ? fitTextStyle(String(label), w, h, baseFontSize, textRules?.lineClamp) : null;
 
     return {
       id: `${element.id}-${index}`,
       type,
-      label: element.type === 'chart'
-        ? `${element.value || '--'}\n${element.label || 'Chart placeholder'}`
-        : element.type === 'divider'
-          ? 'DIVIDER'
-          : element.content || element.label || element.id,
+      label,
       x,
       y,
       w,
@@ -44,7 +67,7 @@ export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] 
       imageZoom: 1,
       imagePanX: 0,
       imagePanY: 0,
-      fontSize: textRules?.fontSize || fallbackFontSize,
+      fontSize: fittedText?.fontSize || baseFontSize,
       fontFamily: 'Inter, sans-serif',
       fontWeight: element.style === 'title' || element.style === 'heading' || element.type === 'chart' ? 'bold' : 'normal',
       fontStyle: element.type === 'caption' ? 'italic' : 'normal',
@@ -52,7 +75,7 @@ export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] 
       backgroundColor: element.type === 'annotation' ? '#1040FF' : element.type === 'chart' ? '#FFF3C4' : 'transparent',
       overflowMode: isText ? (textRules?.overflow || 'clip') : 'clip',
       padding: isText ? (textRules?.padding ?? 8) : undefined,
-      lineClamp: isText ? textRules?.lineClamp : undefined,
+      lineClamp: isText ? fittedText?.lineClamp : undefined,
       zIndex: element.zIndex || index + 1,
       generatedByAI: true
     };
