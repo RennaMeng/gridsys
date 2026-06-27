@@ -281,6 +281,8 @@ const normalizeAssetProfiles = (rawProfiles = [], imageAssets = []) => {
         visualType,
         informationDensity,
         recommendedRole,
+        subject: String(profile.subject || existingProfiles.get(profile.assetId)?.subject || '').slice(0, 120),
+        bestUse: String(profile.bestUse || existingProfiles.get(profile.assetId)?.bestUse || '').slice(0, 140),
         confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.65,
         reasoning: String(profile.reasoning || 'Image profile inferred by AI.').slice(0, 180)
       };
@@ -305,6 +307,8 @@ const buildLocalAssetProfile = (asset) => {
     visualType,
     informationDensity: visualType === 'chart' || visualType === 'diagram' || visualType === 'screenshot' ? 'high' : 'low',
     recommendedRole: VISUAL_TYPE_TO_ROLE[visualType] || asset.role || 'supporting_image',
+    subject: `${visualType.replace('_', ' ')} inferred from file name.`,
+    bestUse: 'Use according to the recommended role when matching template slots.',
     confidence: 0.4,
     reasoning: 'Local filename fallback.'
   };
@@ -866,6 +870,8 @@ Required schema:
       "visualType": "portrait | chart | diagram | product_photo | field_photo | screenshot",
       "informationDensity": "high | medium | low",
       "recommendedRole": "one allowed role",
+      "subject": "what the image appears to contain, max 16 words",
+      "bestUse": "where this image should be used in a portfolio layout, max 18 words",
       "confidence": 0.0,
       "reasoning": "short reason, max 20 words"
     }
@@ -878,6 +884,8 @@ Guidance:
 - Clear human faces or interview photos should become portrait_image.
 - Product, prototype, model, component, or material-detail photos should become product_image.
 - Clean low-density field photos can become hero_image; dense screenshots should not.
+- subject should describe visible content, not just repeat the visualType.
+- bestUse should explain the preferred layout use, such as hero, research evidence, diagram slot, interview card, product detail, or medium support slot.
 - Do not invent factual content.`;
 
       const assetText = assetsForAnalysis.map(asset => ({

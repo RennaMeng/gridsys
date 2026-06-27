@@ -66,9 +66,11 @@ type AssetProfile = {
   visualType: AssetVisualType;
   informationDensity: AssetInformationDensity;
   recommendedRole: Exclude<ImageAssetRole, 'reference'>;
+  subject?: string;
+  bestUse?: string;
   confidence?: number;
   reasoning?: string;
-  source?: 'local' | 'ai';
+  source?: 'local' | 'ai' | 'user';
 };
 type TextAssetRole = 'title' | 'subtitle' | 'body' | 'caption' | 'label';
 
@@ -87,6 +89,12 @@ type TextAsset = {
   label: string;
   content: string;
   role: TextAssetRole;
+};
+
+type LayoutPreviewState = {
+  prompt: string;
+  templateId: string;
+  referenceMode: ReferenceMode;
 };
 
 const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
@@ -122,6 +130,32 @@ const VISUAL_TYPE_ROLE_MAP: Record<AssetVisualType, Exclude<ImageAssetRole, 'ref
   product_photo: 'product_image',
   field_photo: 'supporting_image',
   screenshot: 'supporting_image'
+};
+const LOCAL_ASSET_PROFILE_COPY: Record<AssetVisualType, { subject: string; bestUse: string }> = {
+  portrait: {
+    subject: 'Possible person or user-context image.',
+    bestUse: 'Interview, participant, user story, or case slot.'
+  },
+  chart: {
+    subject: 'Possible data visualization or chart.',
+    bestUse: 'Research evidence, statistic, or data slot.'
+  },
+  diagram: {
+    subject: 'Possible diagram, map, or process visual.',
+    bestUse: 'System, process, method, or mapping slot.'
+  },
+  product_photo: {
+    subject: 'Possible product, prototype, model, or material detail.',
+    bestUse: 'Prototype, component, outcome, or detail slot.'
+  },
+  field_photo: {
+    subject: 'Possible field, context, or supporting photo.',
+    bestUse: 'Hero, context, evidence, or supporting visual slot.'
+  },
+  screenshot: {
+    subject: 'Possible interface screenshot or dense screen capture.',
+    bestUse: 'UI evidence, process, testing, or medium supporting slot.'
+  }
 };
 const isInteractiveTarget = (target: EventTarget | null) => (
   target instanceof HTMLInputElement ||
@@ -161,6 +195,8 @@ const inferLocalAssetProfile = (
     visualType,
     informationDensity,
     recommendedRole: VISUAL_TYPE_ROLE_MAP[visualType] || fallbackRole,
+    subject: LOCAL_ASSET_PROFILE_COPY[visualType].subject,
+    bestUse: LOCAL_ASSET_PROFILE_COPY[visualType].bestUse,
     confidence: 0.45,
     reasoning: 'Local filename and aspect-ratio estimate before AI analysis.',
     source: 'local'
@@ -461,6 +497,7 @@ export default function App() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>(getDefaultTemplateForStage('discover', 'digital-16-9'));
   const [uploadedReferenceTemplate, setUploadedReferenceTemplate] = useState<TemplateJSON | null>(null);
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
+  const [pendingLayoutPreview, setPendingLayoutPreview] = useState<LayoutPreviewState | null>(null);
   const [assetAnalysisPendingIds, setAssetAnalysisPendingIds] = useState<string[]>([]);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
   const [pageStage, setPageStage] = useState<PageStage>('discover');
@@ -567,6 +604,7 @@ export default function App() {
     setHistory([]);
     setFuture([]);
     setLastRenderJSON(null);
+    setPendingLayoutPreview(null);
     setChatMessages([]);
     setChatInput('');
   };
@@ -1141,6 +1179,8 @@ export default function App() {
             visualType: profile.visualType,
             informationDensity: profile.informationDensity,
             recommendedRole: profile.recommendedRole,
+            subject: profile.subject,
+            bestUse: profile.bestUse,
             confidence: profile.confidence,
             reasoning: profile.reasoning,
             source: 'ai'
@@ -1376,6 +1416,49 @@ export default function App() {
     })
   });
 
+  const buildTemplatePreviewRenderJSON = (template: TemplateJSON): RenderJSON => ({
+    templateId: `${template.templateMeta.templateId}_preview`,
+    canvas: {
+      width: template.grid.columns,
+      height: template.grid.rows
+    },
+    elements: (template.elements || []).map((element, index) => {
+      const isImageSlot = element.type === 'image';
+      const slotUse = element.contentSummary || element.role || element.slotId;
+      return {
+        type: isImageSlot ? 'caption' : element.type,
+        id: `preview_${element.slotId}`,
+        x: element.x,
+        y: element.y,
+        w: element.w,
+        h: element.h,
+        style: isImageSlot ? 'caption' : element.style,
+        crop: element.crop,
+        zIndex: element.zIndex || index + 1,
+        content: isImageSlot
+          ? `${language === 'zh' ? '图片槽位' : 'Image slot'}\n${element.role}\n${slotUse}`
+          : (element.contentSummary || element.role || element.slotId),
+        textRules: {
+          maxChars: isImageSlot ? 120 : element.textRules?.maxChars || 90,
+          fontSize: isImageSlot ? 9 : element.textRules?.fontSize || 11,
+          lineClamp: isImageSlot ? 5 : element.textRules?.lineClamp || 3,
+          overflow: 'clip',
+          padding: isImageSlot ? 6 : element.textRules?.padding || 6
+        }
+      };
+    })
+  });
+
+  const getPreviewTemplate = () => {
+    if (referenceMode === 'upload') return uploadedReferenceTemplate;
+    const fallbackTemplateId = selectedTemplateId === 'auto'
+      ? getDefaultTemplateForStage(pageStage, canvasPresetId)
+      : selectedTemplateId;
+    return availableTemplates.find(template => template.templateMeta.templateId === fallbackTemplateId)
+      || availableTemplates.find(template => template.templateMeta.doubleDiamondStage === pageStage)
+      || availableTemplates[0];
+  };
+
   const generateUploadedReferenceTemplate = async () => {
     const referenceImageAssets = imageAssets.filter(asset => asset.role === 'reference');
     if (!referenceImageAssets.length) {
@@ -1418,6 +1501,7 @@ export default function App() {
 
       rememberBlocks();
       setUploadedReferenceTemplate(result.referenceTemplate);
+      setPendingLayoutPreview(null);
       setLastRenderJSON(result.renderJSON);
       setBlocks(renderJSONToLayoutBlocks(result.renderJSON));
       selectOnly(null);
@@ -1434,7 +1518,32 @@ export default function App() {
     }
   };
 
-  const callGeminiLayout = async (userMessage: string) => {
+  const showTemplatePreviewBeforeLayout = (userMessage: string) => {
+    const template = getPreviewTemplate();
+    if (!template) {
+      throw new Error(language === 'zh' ? '模板还没有加载完成，请稍后再试。' : 'Templates are still loading.');
+    }
+
+    const previewRenderJSON = buildTemplatePreviewRenderJSON(template);
+    rememberBlocks();
+    setLayoutMode('editorial');
+    setLastRenderJSON(previewRenderJSON);
+    setPendingLayoutPreview({
+      prompt: userMessage,
+      templateId: template.templateMeta.templateId,
+      referenceMode
+    });
+    setBlocks(renderJSONToLayoutBlocks(previewRenderJSON));
+    selectOnly(null);
+    setChatMessages(prev => [...prev, {
+      role: 'ai',
+      text: language === 'zh'
+        ? `已先展示模板骨架：${template.templateMeta.templateName}。请检查槽位逻辑，确认后再完成最终排版。未匹配图片的槽位会先用文字说明需要的素材。`
+        : `Template structure previewed: ${template.templateMeta.templateName}. Review the slot logic first, then confirm the final layout. Unmatched image slots are labeled with the needed asset type.`
+    }]);
+  };
+
+  const callGeminiLayout = async (userMessage: string, confirmedFinalLayout = false) => {
     setAiLoading(true);
     setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setChatInput('');
@@ -1442,6 +1551,21 @@ export default function App() {
     try {
       if (!availableTemplates.length) {
         throw new Error('模板还没有加载完成，请稍后再试。');
+      }
+
+      if (!confirmedFinalLayout && pendingLayoutPreview) {
+        setChatMessages(prev => [...prev, {
+          role: 'ai',
+          text: language === 'zh'
+            ? '请先使用画板下方的确认按钮完成最终排版。'
+            : 'Use the confirmation button below the canvas to complete the final layout.'
+        }]);
+        return;
+      }
+
+      if (!confirmedFinalLayout && !lastRenderJSON) {
+        showTemplatePreviewBeforeLayout(userMessage);
+        return;
       }
 
       const analysis = analyzeProjectContent(userMessage);
@@ -1502,6 +1626,7 @@ export default function App() {
       rememberBlocks();
       setLayoutMode('editorial');
       setLastRenderJSON(renderJSON);
+      setPendingLayoutPreview(null);
       setBlocks(newBlocks);
       selectOnly(null);
       setChatMessages(prev => [...prev, {
@@ -1923,11 +2048,23 @@ export default function App() {
                               </select>
                             </div>
 
-                            {profile.reasoning && (
-                              <p className="mt-1 line-clamp-2 text-[8px] leading-snug text-swiss-black/35">
-                                {profile.reasoning}
-                              </p>
-                            )}
+                            <div className="mt-1 space-y-0.5 text-[8px] leading-snug text-swiss-black/40">
+                              {profile.subject && (
+                                <p className="line-clamp-1">
+                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '内容' : 'Subject'}:</span> {profile.subject}
+                                </p>
+                              )}
+                              {profile.bestUse && (
+                                <p className="line-clamp-1">
+                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '适合' : 'Use'}:</span> {profile.bestUse}
+                                </p>
+                              )}
+                              {profile.reasoning && (
+                                <p className="line-clamp-1">
+                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '理由' : 'Why'}:</span> {profile.reasoning}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2148,7 +2285,9 @@ export default function App() {
             }
             className="w-full h-11 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
           >
-            {lastRenderJSON ? t.updateWithAI : t.generate}
+            {pendingLayoutPreview
+              ? (language === 'zh' ? '请在画板下方确认' : 'Confirm Below Canvas')
+              : lastRenderJSON ? t.updateWithAI : t.generate}
           </button>
         </div>
       </aside>
@@ -2418,6 +2557,42 @@ export default function App() {
             </div>
           </div>
         </div>
+        {pendingLayoutPreview && (
+          <div className="fixed left-[324px] right-[284px] bottom-5 z-[80] border border-swiss-black/10 bg-white/90 backdrop-blur shadow-xl p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-swiss-red">
+                  {language === 'zh' ? '模板骨架待确认' : 'Template Preview Ready'}
+                </p>
+                <p className="mt-1 truncate text-[10px] leading-snug text-swiss-black/55">
+                  {language === 'zh'
+                    ? '请先检查槽位逻辑。确认后 AI 才会分配图片和文字生成最终排版。'
+                    : 'Review the slot logic first. AI will assign images and text only after confirmation.'}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => {
+                    setPendingLayoutPreview(null);
+                    setLastRenderJSON(null);
+                  }}
+                  className="h-9 px-3 border border-swiss-black/10 bg-white text-[9px] font-black uppercase tracking-widest text-swiss-black/45 hover:border-swiss-red hover:text-swiss-red transition-colors"
+                >
+                  {language === 'zh' ? '继续调整' : 'Keep Editing'}
+                </button>
+                <button
+                  onClick={() => callGeminiLayout(pendingLayoutPreview.prompt, true)}
+                  disabled={aiLoading}
+                  className="h-9 px-4 bg-swiss-red text-white text-[9px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
+                >
+                  {aiLoading
+                    ? (language === 'zh' ? '生成中...' : 'Generating...')
+                    : (language === 'zh' ? '确认并完成排版' : 'Confirm Final Layout')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Sidebar Right: Inspector */}
