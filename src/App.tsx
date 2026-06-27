@@ -511,6 +511,7 @@ export default function App() {
   const [uploadedReferenceTemplate, setUploadedReferenceTemplate] = useState<TemplateJSON | null>(null);
   const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
   const [pendingLayoutPreview, setPendingLayoutPreview] = useState<LayoutPreviewState | null>(null);
+  const [lastLayoutPrompt, setLastLayoutPrompt] = useState('');
   const [assetAnalysisPendingIds, setAssetAnalysisPendingIds] = useState<string[]>([]);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
   const [pageStage, setPageStage] = useState<PageStage>('discover');
@@ -620,6 +621,7 @@ export default function App() {
     setFuture([]);
     setLastRenderJSON(null);
     setPendingLayoutPreview(null);
+    setLastLayoutPrompt('');
     setChatMessages([]);
     setChatInput('');
   };
@@ -1505,6 +1507,7 @@ export default function App() {
       return {
         type: isImageSlot ? 'caption' : element.type,
         id: `preview_${element.slotId}`,
+        sourceSlotId: element.slotId,
         x: element.x,
         y: element.y,
         w: element.w,
@@ -1536,10 +1539,10 @@ export default function App() {
   };
 
   const buildPreviewPlanFromBlocks = (): PreviewPlanItem[] => blocks.reduce<PreviewPlanItem[]>((plan, block) => {
-      const match = block.id.match(/^preview_(.+)-\d+$/);
-      if (!match) return plan;
+      const slotId = block.sourceSlotId || block.id.replace(/^preview_/, '').replace(/-\d+$/, '');
+      if (!slotId) return plan;
       plan.push({
-        slotId: match[1],
+        slotId,
         type: block.type,
         x: block.x,
         y: block.y,
@@ -1661,8 +1664,15 @@ export default function App() {
         return;
       }
 
-      const analysis = analyzeProjectContent(userMessage);
-      const contentJSON = buildContentJSON(userMessage, analysis.detectedStage);
+      const isAiRevision = Boolean(lastRenderJSON) && !pendingLayoutPreview && !confirmedFinalLayout;
+      const contentPrompt = confirmedFinalLayout && pendingLayoutPreview
+        ? pendingLayoutPreview.prompt
+        : isAiRevision
+          ? (lastLayoutPrompt || pendingLayoutPreview?.prompt || userMessage)
+          : userMessage;
+      const editInstruction = isAiRevision ? userMessage : '';
+      const analysis = analyzeProjectContent(contentPrompt);
+      const contentJSON = buildContentJSON(contentPrompt, analysis.detectedStage);
       const layoutImageAssets = imageAssets.filter(asset => asset.role !== 'reference');
       const useOwnReference = referenceMode === 'upload';
       const referenceImageAssets = useOwnReference
@@ -1677,7 +1687,8 @@ export default function App() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          prompt: userMessage,
+          prompt: contentPrompt,
+          editInstruction,
           selectedTemplateId: confirmedFinalLayout && pendingLayoutPreview ? pendingLayoutPreview.templateId : selectedTemplateId,
           canvasPresetId,
           referenceMode,
@@ -1720,6 +1731,7 @@ export default function App() {
       rememberBlocks();
       setLayoutMode('editorial');
       setLastRenderJSON(renderJSON);
+      setLastLayoutPrompt(contentPrompt);
       setPendingLayoutPreview(null);
       setBlocks(newBlocks);
       selectOnly(null);

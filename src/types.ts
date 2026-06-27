@@ -35,6 +35,7 @@ export interface LayoutBlock {
   zIndex?: number;
   linkUrl?: string;
   generatedByAI?: boolean;
+  sourceSlotId?: string;
 }
 
 export interface GridSettings {
