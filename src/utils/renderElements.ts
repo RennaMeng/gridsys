@@ -78,7 +78,8 @@ export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] 
       lineClamp: isText ? fittedText?.lineClamp : undefined,
       zIndex: element.zIndex || index + 1,
       generatedByAI: true,
-      sourceSlotId: element.sourceSlotId || element.id
+      sourceSlotId: element.sourceSlotId || element.id,
+      previewSlotKind: element.previewSlotKind
     };
   });
 }

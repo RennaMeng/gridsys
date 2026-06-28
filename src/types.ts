@@ -36,6 +36,7 @@ export interface LayoutBlock {
   linkUrl?: string;
   generatedByAI?: boolean;
   sourceSlotId?: string;
+  previewSlotKind?: 'image' | 'text';
 }
 
 export interface GridSettings {

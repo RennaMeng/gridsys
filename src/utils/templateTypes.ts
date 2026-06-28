@@ -152,6 +152,7 @@ export type RenderElement = {
   textRules?: TextRules;
   sourceSlotId?: string;
   backgroundColor?: string;
+  previewSlotKind?: 'image' | 'text';
 };
 
 export type RenderJSON = {

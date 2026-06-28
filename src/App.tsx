@@ -1505,11 +1505,11 @@ export default function App() {
       },
       elements: (template.elements || []).map((element, index) => {
       const isImageSlot = element.type === 'image';
-      const previewFill = isImageSlot ? '#fff1f4' : '#f3f4f6';
       return {
         type: isImageSlot ? 'caption' : element.type,
         id: `preview_${element.slotId}`,
         sourceSlotId: element.slotId,
+        previewSlotKind: isImageSlot ? 'image' : 'text',
         x: element.x,
         y: element.y,
         w: element.w,
@@ -1518,7 +1518,7 @@ export default function App() {
         crop: element.crop,
         zIndex: element.zIndex || index + 1,
         content: generatedTextForSlot(element, index),
-        backgroundColor: previewFill,
+        backgroundColor: isImageSlot ? '#ffffff' : 'transparent',
         textRules: {
           maxChars: isImageSlot ? 72 : 72,
           fontSize: isImageSlot ? 8 : Math.min(element.textRules?.fontSize || 10, 10),
@@ -2473,6 +2473,9 @@ export default function App() {
                 const isSelected = selectedIds.includes(block.id);
                 const isTextLayer = isTextBlock(block.type);
                 const isEditingText = editingTextId === block.id;
+                const isPreviewSkeleton = Boolean(pendingLayoutPreview && block.previewSlotKind);
+                const isPreviewImageSlot = isPreviewSkeleton && block.previewSlotKind === 'image';
+                const isPreviewTextSlot = isPreviewSkeleton && block.previewSlotKind === 'text';
                 const blockOverflowMode = block.overflowMode || (isTextLayer ? 'visible' : 'clip');
                 const rect = isDragging 
                   ? getPixelRect(dragPreview!.x, dragPreview!.y, block.w, block.h, gridMetrics)
@@ -2520,7 +2523,15 @@ export default function App() {
                       className={`absolute inset-0 flex flex-col transition-all duration-300 ${
                         blockOverflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
                       } ${
-                        isTextLayer
+                        isPreviewImageSlot
+                          ? isSelected
+                            ? 'bg-white border border-swiss-red shadow-xl ring-2 ring-swiss-red ring-offset-2 ring-offset-white text-swiss-black'
+                            : 'bg-white border border-swiss-black/10 shadow-[0_2px_10px_rgba(0,0,0,0.12)] text-swiss-black'
+                          : isPreviewTextSlot
+                            ? isSelected
+                              ? 'bg-transparent border border-swiss-red ring-2 ring-swiss-red ring-offset-2 ring-offset-white'
+                              : 'bg-transparent border border-transparent group-hover:border-swiss-red/30'
+                            : isTextLayer
                           ? isSelected
                             ? 'border border-swiss-red ring-2 ring-swiss-red ring-offset-2 ring-offset-white'
                             : 'border border-transparent group-hover:border-swiss-red/30'
@@ -2533,7 +2544,9 @@ export default function App() {
                                 : 'bg-white border border-swiss-black/10 text-swiss-black shadow-sm'
                       }`}
                       style={{
-                        backgroundColor: isTextLayer
+                        backgroundColor: isPreviewSkeleton
+                          ? undefined
+                          : isTextLayer
                           ? (block.backgroundColor && block.backgroundColor !== 'transparent' ? block.backgroundColor : 'transparent')
                           : undefined
                       }}
@@ -2573,7 +2586,7 @@ export default function App() {
                         block.imageUrl ? 'opacity-0' : 'opacity-100'
                       } ${isTextLayer ? '' : (block.w === 1 || block.h === 1 ? 'p-1.5' : 'p-4')}`}>
                         {/* Drag Handle & Label */}
-                        {block.type !== 'title' && (
+                        {block.type !== 'title' && !isPreviewImageSlot && (
                           <div className={`transition-opacity duration-150 ${
                             isSelected ? 'opacity-100' : 'opacity-0'
                           } flex items-center justify-between pr-4 ${isTextLayer ? 'absolute -top-5 left-0 right-0 text-swiss-red' : ''}`}>
@@ -2589,7 +2602,28 @@ export default function App() {
                         <div className={`flex-1 flex flex-col ${isTextLayer ? 'items-start justify-start' : 'items-center justify-center'} ${
                           blockOverflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
                         } relative`}>
-                          {block.type === 'title' ? (
+                          {isPreviewImageSlot ? (
+                            <div className="absolute inset-0 flex flex-col justify-between p-4 text-swiss-black">
+                              <div className="flex min-h-[34%] items-center justify-center border-2 border-dashed border-swiss-black/15 text-swiss-black/20">
+                                <div className="flex flex-col items-center gap-2">
+                                  <Upload size={Math.min(46, Math.max(22, rect.height * 0.12))} strokeWidth={2.5} />
+                                  <span className="text-[10px] font-black italic uppercase tracking-tight">Drop Image Here</span>
+                                </div>
+                              </div>
+                              <div className="flex flex-1 items-center justify-center px-2">
+                                <span className="font-black uppercase tracking-tighter leading-none text-center" style={{ fontSize: `${Math.min(28, Math.max(14, rect.height * 0.13))}px` }}>
+                                  IMAGE
+                                </span>
+                              </div>
+                              <div className="flex items-end justify-between border-t border-swiss-black/5 pt-2 font-mono text-[8px] uppercase tracking-[0.18em] text-swiss-black/25">
+                                <div className="flex flex-col leading-tight">
+                                  <span>XY:{block.x}:{block.y}</span>
+                                  <span>WH:{block.w}:{block.h}</span>
+                                </div>
+                                <span>GRID.SYS</span>
+                              </div>
+                            </div>
+                          ) : block.type === 'title' ? (
                             <div
                               className={`${blockOverflowMode === 'autoHeight' ? 'relative' : 'absolute inset-0'} flex items-start justify-start`}
                               style={{ padding: block.padding ?? 8 }}
@@ -2645,7 +2679,7 @@ export default function App() {
                           )}
                         </div>
 
-                        {block.type !== 'title' && (!isTextLayer || isSelected) && (
+                        {block.type !== 'title' && !isPreviewImageSlot && (!isTextLayer || isSelected) && (
                           <div className={`transition-opacity duration-150 ${
                             isSelected ? 'opacity-100' : 'opacity-0'
                           } flex items-center justify-between pt-1 border-t font-mono ${block.w === 1 || block.h === 1 ? 'text-[5px]' : 'text-[8px]'} uppercase tracking-widest ${
