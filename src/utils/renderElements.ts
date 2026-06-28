@@ -72,7 +72,7 @@ export function renderJSONToLayoutBlocks(renderJSON: RenderJSON): LayoutBlock[] 
       fontWeight: element.style === 'title' || element.style === 'heading' || element.type === 'chart' ? 'bold' : 'normal',
       fontStyle: element.type === 'caption' ? 'italic' : 'normal',
       textColor: '#111111',
-      backgroundColor: element.type === 'annotation' ? '#1040FF' : element.type === 'chart' ? '#FFF3C4' : 'transparent',
+      backgroundColor: element.backgroundColor || (element.type === 'annotation' ? '#1040FF' : element.type === 'chart' ? '#FFF3C4' : 'transparent'),
       overflowMode: isText ? (textRules?.overflow || 'clip') : 'clip',
       padding: isText ? (textRules?.padding ?? 8) : undefined,
       lineClamp: isText ? fittedText?.lineClamp : undefined,

@@ -1505,6 +1505,7 @@ export default function App() {
       },
       elements: (template.elements || []).map((element, index) => {
       const isImageSlot = element.type === 'image';
+      const previewFill = isImageSlot ? '#fff1f4' : '#f3f4f6';
       return {
         type: isImageSlot ? 'caption' : element.type,
         id: `preview_${element.slotId}`,
@@ -1517,6 +1518,7 @@ export default function App() {
         crop: element.crop,
         zIndex: element.zIndex || index + 1,
         content: generatedTextForSlot(element, index),
+        backgroundColor: previewFill,
         textRules: {
           maxChars: isImageSlot ? 72 : 72,
           fontSize: isImageSlot ? 8 : Math.min(element.textRules?.fontSize || 10, 10),
