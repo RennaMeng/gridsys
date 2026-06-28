@@ -109,6 +109,7 @@ type PreviewPlanItem = {
   lineClamp?: number;
 };
 
+const clampValue = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
 const isTextBlock = (type: LayoutBlock['type']) => TEXT_BLOCK_TYPES.includes(type);
 const createLocalId = () => Math.random().toString(36).slice(2, 10);
@@ -1504,6 +1505,7 @@ export default function App() {
       },
       elements: (template.elements || []).map((element, index) => {
       const isImageSlot = element.type === 'image';
+      const previewFill = isImageSlot ? '#fff1f4' : '#f3f4f6';
       return {
         type: isImageSlot ? 'caption' : element.type,
         id: `preview_${element.slotId}`,
@@ -1516,6 +1518,7 @@ export default function App() {
         crop: element.crop,
         zIndex: element.zIndex || index + 1,
         content: generatedTextForSlot(element, index),
+        backgroundColor: previewFill,
         textRules: {
           maxChars: isImageSlot ? 72 : 72,
           fontSize: isImageSlot ? 8 : Math.min(element.textRules?.fontSize || 10, 10),
@@ -1538,16 +1541,34 @@ export default function App() {
       || availableTemplates[0];
   };
 
+  const getPlanTemplate = () => {
+    const templateId = pendingLayoutPreview?.templateId || selectedTemplateId;
+    if (referenceMode === 'upload') return uploadedReferenceTemplate;
+    if (templateId && templateId !== 'auto') {
+      return availableTemplates.find(template => template.templateMeta.templateId === templateId) || getPreviewTemplate();
+    }
+    return getPreviewTemplate();
+  };
+
   const buildPreviewPlanFromBlocks = (): PreviewPlanItem[] => blocks.reduce<PreviewPlanItem[]>((plan, block) => {
+      const planTemplate = getPlanTemplate();
+      const templateColumns = planTemplate?.grid?.columns || COLUMNS;
+      const templateRows = planTemplate?.grid?.rows || ROWS;
+      const toTemplateX = (value: number) => Math.round((value / COLUMNS) * templateColumns);
+      const toTemplateY = (value: number) => Math.round((value / ROWS) * templateRows);
       const slotId = block.sourceSlotId || block.id.replace(/^preview_/, '').replace(/-\d+$/, '');
       if (!slotId) return plan;
+      const x = clampValue(toTemplateX(block.x), 0, templateColumns - 1);
+      const y = clampValue(toTemplateY(block.y), 0, templateRows - 1);
+      const w = clampValue(toTemplateX(block.w), 1, templateColumns - x);
+      const h = clampValue(toTemplateY(block.h), 1, templateRows - y);
       plan.push({
         slotId,
         type: block.type,
-        x: block.x,
-        y: block.y,
-        w: block.w,
-        h: block.h,
+        x,
+        y,
+        w,
+        h,
         note: block.label,
         fontSize: block.fontSize,
         lineClamp: block.lineClamp
@@ -1693,7 +1714,7 @@ export default function App() {
           canvasPresetId,
           referenceMode,
           customTemplate: useOwnReference ? uploadedReferenceTemplate : undefined,
-          previewPlan: confirmedFinalLayout && pendingLayoutPreview ? buildPreviewPlanFromBlocks() : undefined,
+          previewPlan: (confirmedFinalLayout && pendingLayoutPreview) || isAiRevision ? buildPreviewPlanFromBlocks() : undefined,
           contentJSON,
           textAssets: (textAssetsEnabled ? textAssets : []).map(asset => ({
             id: asset.id,

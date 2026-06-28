@@ -340,18 +340,24 @@ const normalizeSlotAssignments = (raw, template, editInstruction = '') => {
 
 const normalizePreviewPlan = (rawPlan = [], template) => {
   const validSlotIds = new Set((template.elements || []).map(element => element.slotId));
+  const columns = Number(template.grid?.columns) || REFERENCE_GRID_WIDTH;
+  const rows = Number(template.grid?.rows) || REFERENCE_GRID_HEIGHT;
   return (Array.isArray(rawPlan) ? rawPlan : [])
     .filter(item => validSlotIds.has(item.slotId))
-    .map(item => ({
-      slotId: String(item.slotId),
-      x: clampNumber(item.x, 0, REFERENCE_GRID_WIDTH - 1, 0),
-      y: clampNumber(item.y, 0, REFERENCE_GRID_HEIGHT - 1, 0),
-      w: clampNumber(item.w, 1, REFERENCE_GRID_WIDTH, 4),
-      h: clampNumber(item.h, 1, REFERENCE_GRID_HEIGHT, 2),
-      note: String(item.note || '').replace(/\s+/g, ' ').trim().slice(0, 180),
-      fontSize: item.fontSize === undefined ? undefined : clampNumber(item.fontSize, 7, 36, undefined),
-      lineClamp: item.lineClamp === undefined ? undefined : clampNumber(item.lineClamp, 1, 8, undefined)
-    }));
+    .map(item => {
+      const x = clampNumber(item.x, 0, columns - 1, 0);
+      const y = clampNumber(item.y, 0, rows - 1, 0);
+      return {
+        slotId: String(item.slotId),
+        x,
+        y,
+        w: clampNumber(item.w, 1, columns - x, 4),
+        h: clampNumber(item.h, 1, rows - y, 2),
+        note: String(item.note || '').replace(/\s+/g, ' ').trim().slice(0, 180),
+        fontSize: item.fontSize === undefined ? undefined : clampNumber(item.fontSize, 7, 36, undefined),
+        lineClamp: item.lineClamp === undefined ? undefined : clampNumber(item.lineClamp, 1, 8, undefined)
+      };
+    });
 };
 
 const applyPreviewPlanToTemplate = (template, rawPlan = []) => {
@@ -359,6 +365,8 @@ const applyPreviewPlanToTemplate = (template, rawPlan = []) => {
   if (!previewPlan.length) return { template, previewPlan };
 
   const planMap = new Map(previewPlan.map(item => [item.slotId, item]));
+  const columns = Number(template.grid?.columns) || REFERENCE_GRID_WIDTH;
+  const rows = Number(template.grid?.rows) || REFERENCE_GRID_HEIGHT;
   return {
     previewPlan,
     template: {
@@ -366,10 +374,10 @@ const applyPreviewPlanToTemplate = (template, rawPlan = []) => {
       elements: (template.elements || []).map(element => {
         const plan = planMap.get(element.slotId);
         if (!plan) return element;
-        const x = clampNumber(plan.x, 0, REFERENCE_GRID_WIDTH - 1, element.x);
-        const y = clampNumber(plan.y, 0, REFERENCE_GRID_HEIGHT - 1, element.y);
-        const w = clampNumber(plan.w, 1, REFERENCE_GRID_WIDTH - x, element.w);
-        const h = clampNumber(plan.h, 1, REFERENCE_GRID_HEIGHT - y, element.h);
+        const x = clampNumber(plan.x, 0, columns - 1, element.x);
+        const y = clampNumber(plan.y, 0, rows - 1, element.y);
+        const w = clampNumber(plan.w, 1, columns - x, element.w);
+        const h = clampNumber(plan.h, 1, rows - y, element.h);
         const textRules = element.type === 'image' || element.type === 'divider'
           ? element.textRules
           : {
@@ -449,13 +457,42 @@ const imageSuggestionForSlot = (templateElement) => {
   return '建议放置：与该槽位语义匹配的图片';
 };
 
-const fallbackAssetForSlot = (slotId, contentJSON, imageAssets, usedAssetIds = new Set()) => {
+const isAssetCompatibleWithSlot = (templateElement, asset) => {
+  if (!asset) return false;
+  const profile = asset.assetProfile || buildLocalAssetProfile(asset);
+  const role = `${templateElement.role || ''} ${templateElement.slotId || ''} ${templateElement.contentSummary || ''}`.toLowerCase();
+  const visualType = profile.visualType;
+  const recommendedRole = profile.recommendedRole;
+  const isChartOrDiagram = visualType === 'chart' || visualType === 'diagram' || visualType === 'screenshot' || recommendedRole === 'data_visualization' || recommendedRole === 'diagram_image';
+  const isPortrait = visualType === 'portrait' || recommendedRole === 'portrait_image';
+  const isProduct = visualType === 'product_photo' || recommendedRole === 'product_image';
+  const isScene = visualType === 'field_photo' || recommendedRole === 'hero_image' || recommendedRole === 'supporting_image';
+
+  if (/chart|data|stat|visualization|diagram|map|flow|system|process/.test(role)) return isChartOrDiagram;
+  if (/portrait|participant|user|interview|persona|feedback/.test(role)) return isPortrait || isScene;
+  if (/product|prototype|component|material|outcome|module/.test(role)) return isProduct || isScene;
+  if (/testing|scenario|documentation|usage/.test(role)) return isScene || isProduct || isPortrait || visualType === 'screenshot';
+  if (/hero|background|context|visual|image/.test(role)) return isScene || isProduct || isPortrait;
+
+  return recommendedRole === 'supporting_image' || isScene;
+};
+
+const fallbackAssetForSlot = (templateElement, contentJSON, imageAssets, usedAssetIds = new Set()) => {
   const content = contentJSON?.content || {};
-  const isAvailable = id => id && !usedAssetIds.has(id) && imageAssets.some(asset => asset.id === id);
+  const slotId = templateElement.slotId;
+  const assetById = new Map(imageAssets.map(asset => [asset.id, asset]));
+  const isAvailable = id => {
+    const asset = assetById.get(id);
+    return Boolean(asset && !usedAssetIds.has(id) && isAssetCompatibleWithSlot(templateElement, asset));
+  };
   const firstAvailable = (...ids) => ids.find(isAvailable);
   const matchAsset = (...predicates) => {
     for (const predicate of predicates) {
-      const found = imageAssets.find(asset => !usedAssetIds.has(asset.id) && predicate(asset, asset.assetProfile || buildLocalAssetProfile(asset)));
+      const found = imageAssets.find(asset => (
+        !usedAssetIds.has(asset.id) &&
+        isAssetCompatibleWithSlot(templateElement, asset) &&
+        predicate(asset, asset.assetProfile || buildLocalAssetProfile(asset))
+      ));
       if (found) return found.id;
     }
     return undefined;
@@ -515,7 +552,7 @@ const fallbackAssetForSlot = (slotId, contentJSON, imageAssets, usedAssetIds = n
     diagram_overlay_image: firstAvailable(content.diagram_overlay_image, content.module_card_arm)
   };
 
-  return fallbackMap[slotId] || firstAvailable(heroAsset, supportingAsset, chartOrDiagramAsset, ...imageAssets.map(asset => asset.id));
+  return fallbackMap[slotId] || matchAsset(() => true);
 };
 
 const fitTextToRule = (value, textRules) => {
@@ -537,7 +574,8 @@ const clampNumber = (value, min, max, fallback) => {
 const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
   const source = raw.renderJSON || raw;
   const validImageIds = new Set(imageAssets.map(asset => asset.id));
-  const fallbackImage = imageAssets[0]?.id;
+  const usedAssetIds = new Set();
+  const firstUnusedImage = () => imageAssets.find(asset => !usedAssetIds.has(asset.id))?.id;
   const content = contentJSON?.content || {};
   const elements = Array.isArray(source.elements) ? source.elements : [];
 
@@ -566,9 +604,29 @@ const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
 
       if (type === 'image') {
         const requested = element.src || element.assetId;
+        const assetId = validImageIds.has(requested) && !usedAssetIds.has(requested)
+          ? requested
+          : firstUnusedImage();
+        if (assetId) {
+          usedAssetIds.add(assetId);
+          return {
+            ...base,
+            src: assetId
+          };
+        }
+
         return {
           ...base,
-          src: validImageIds.has(requested) ? requested : fallbackImage
+          type: 'caption',
+          style: 'caption',
+          content: '建议放置：与该槽位语义匹配的图片',
+          textRules: {
+            maxChars: 72,
+            fontSize: 9,
+            lineClamp: 3,
+            overflow: 'clip',
+            padding: 6
+          }
         };
       }
 
@@ -596,7 +654,7 @@ const normalizeReferenceRenderJSON = (raw, imageAssets, contentJSON) => {
       {
         type: 'image',
         id: 'reference_image_1',
-        src: fallbackImage,
+        src: firstUnusedImage(),
         x: 0,
         y: 0,
         w: 16,
@@ -848,12 +906,16 @@ const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, 
 
       if (templateElement.type === 'image') {
         const requestedAssetId = assignment?.assetId;
-        const uniqueRequestedAssetId = requestedAssetId && validImageIds.has(requestedAssetId) && !usedAssetIds.has(requestedAssetId)
+        const requestedAsset = imageAssets.find(asset => asset.id === requestedAssetId);
+        const uniqueRequestedAssetId = requestedAssetId &&
+          validImageIds.has(requestedAssetId) &&
+          !usedAssetIds.has(requestedAssetId) &&
+          isAssetCompatibleWithSlot(templateElement, requestedAsset)
           ? requestedAssetId
           : undefined;
         const fallbackAssetId = uniqueRequestedAssetId
           ? undefined
-          : fallbackAssetForSlot(templateElement.slotId, contentJSON, imageAssets, usedAssetIds);
+          : fallbackAssetForSlot(templateElement, contentJSON, imageAssets, usedAssetIds);
         const assetId = uniqueRequestedAssetId || fallbackAssetId;
 
         if (assetId) {
