@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { toJpeg } from 'html-to-image';
+import html2canvas from 'html2canvas';
 import { 
   Plus, 
   Minus, 
@@ -1391,6 +1391,21 @@ export default function App() {
 
   const waitForPaint = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
+  const waitForBoardImages = async (node: HTMLElement) => {
+    const images = Array.from(node.querySelectorAll('img'));
+    await Promise.all(images.map(async image => {
+      if (!image.complete || image.naturalWidth === 0) {
+        await new Promise<void>(resolve => {
+          image.addEventListener('load', () => resolve(), { once: true });
+          image.addEventListener('error', () => resolve(), { once: true });
+        });
+      }
+      if ('decode' in image && image.complete && image.naturalWidth > 0) {
+        await image.decode().catch(() => undefined);
+      }
+    }));
+  };
+
   const captureCurrentBoardJpeg = async () => {
     const node = boardCaptureRef.current;
     if (!node) {
@@ -1406,23 +1421,29 @@ export default function App() {
     try {
       await waitForPaint();
       await waitForPaint();
-      return await toJpeg(node, {
-        quality: 0.95,
+      await waitForBoardImages(node);
+      await waitForPaint();
+      const canvas = await html2canvas(node, {
         backgroundColor: '#ffffff',
-        pixelRatio: 2,
+        scale: 2,
         width: canvasSize.width,
         height: canvasSize.height,
-        cacheBust: true,
-        filter: domNode => {
-          if (!(domNode instanceof HTMLElement)) return true;
-          return domNode.dataset.aiCaptureIgnore !== 'true';
+        windowWidth: canvasSize.width,
+        windowHeight: canvasSize.height,
+        useCORS: true,
+        allowTaint: true,
+        imageTimeout: 15000,
+        ignoreElements: element => {
+          return element instanceof HTMLElement && element.dataset.aiCaptureIgnore === 'true';
         },
-        style: {
-          transform: 'none',
-          transformOrigin: 'top left',
-          boxShadow: 'none'
+        onclone: (_document, clonedElement) => {
+          const clonedNode = clonedElement as HTMLElement;
+          clonedNode.style.transform = 'none';
+          clonedNode.style.transformOrigin = 'top left';
+          clonedNode.style.boxShadow = 'none';
         }
       });
+      return canvas.toDataURL('image/jpeg', 0.95);
     } finally {
       setSelectedId(previousSelectedId);
       setSelectedIds(previousSelectedIds);
