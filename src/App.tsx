@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { toJpeg } from 'html-to-image';
 import { 
   Plus, 
   Minus, 
@@ -513,10 +514,13 @@ export default function App() {
   const [dragPreview, setDragPreview] = useState<{ id: string, x: number, y: number } | null>(null);
   const [selectionBox, setSelectionBox] = useState<{ left: number, top: number, width: number, height: number } | null>(null);
   const [aiConfirmOpen, setAiConfirmOpen] = useState(false);
+  const [aiPreparingPreview, setAiPreparingPreview] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreviewImage, setAiPreviewImage] = useState<string | null>(null);
+  const [aiPendingBoardImage, setAiPendingBoardImage] = useState<string | null>(null);
   const [aiGenerationError, setAiGenerationError] = useState<string | null>(null);
   const safeAreaRef = useRef<HTMLDivElement>(null);
+  const boardCaptureRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<{ startX: number, startY: number } | null>(null);
   const dragRef = useRef<{
     ids: string[]
@@ -1377,38 +1381,73 @@ export default function App() {
     return svg.outerHTML;
   };
 
-  const renderCleanBoardJpeg = async () => {
-    const svgMarkup = buildLayoutSvgMarkup();
-    const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    try {
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Failed to render canvas preview.'));
-        img.src = url;
-      });
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(canvasSize.width);
-      canvas.height = Math.round(canvasSize.height);
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('Canvas rendering is not available.');
-      context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL('image/jpeg', 0.92);
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  };
-
   const exportSVG = () => {
     const blob = new Blob([buildLayoutSvgMarkup()], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
     a.download = `gridsys_layout_${canvasViewportLabel.toLowerCase()}.svg`; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const waitForPaint = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+  const captureCurrentBoardJpeg = async () => {
+    const node = boardCaptureRef.current;
+    if (!node) {
+      throw new Error(language === 'zh' ? '当前画布还没有准备好。' : 'The canvas is not ready yet.');
+    }
+
+    const previousSelectedId = selectedId;
+    const previousSelectedIds = selectedIds;
+    setSelectedId(null);
+    setSelectedIds([]);
+    setSelectionBox(null);
+
+    try {
+      await waitForPaint();
+      await waitForPaint();
+      return await toJpeg(node, {
+        quality: 0.95,
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        width: canvasSize.width,
+        height: canvasSize.height,
+        cacheBust: true,
+        filter: domNode => {
+          if (!(domNode instanceof HTMLElement)) return true;
+          return domNode.dataset.aiCaptureIgnore !== 'true';
+        },
+        style: {
+          transform: 'none',
+          transformOrigin: 'top left',
+          boxShadow: 'none'
+        }
+      });
+    } finally {
+      setSelectedId(previousSelectedId);
+      setSelectedIds(previousSelectedIds);
+    }
+  };
+
+  const closeAiConfirm = () => {
+    setAiConfirmOpen(false);
+    setAiPendingBoardImage(null);
+  };
+
+  const openAiPreviewConfirm = async () => {
+    setAiGenerationError(null);
+    setAiPreviewImage(null);
+    setAiPreparingPreview(true);
+
+    try {
+      const boardImage = await captureCurrentBoardJpeg();
+      setAiPendingBoardImage(boardImage);
+      setAiConfirmOpen(true);
+    } catch (error) {
+      setAiGenerationError(error instanceof Error ? error.message : 'Failed to capture canvas preview.');
+    } finally {
+      setAiPreparingPreview(false);
+    }
   };
 
   const startAiPreviewGeneration = async () => {
@@ -1419,7 +1458,10 @@ export default function App() {
     setIsLocked(true);
 
     try {
-      const boardImage = await renderCleanBoardJpeg();
+      const boardImage = aiPendingBoardImage;
+      if (!boardImage) {
+        throw new Error(language === 'zh' ? '缺少将发送给 AI 的画板截图，请重新点击 AI 预览生成。' : 'Missing canvas capture. Please start AI preview again.');
+      }
       const response = await fetch('/api/generate-ai-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1444,12 +1486,14 @@ export default function App() {
       setAiGenerationError(error instanceof Error ? error.message : 'AI preview generation failed.');
       setIsLocked(false);
     } finally {
+      setAiPendingBoardImage(null);
       setAiGenerating(false);
     }
   };
 
   const exitAiPreview = () => {
     setAiPreviewImage(null);
+    setAiPendingBoardImage(null);
     setAiGenerationError(null);
     setIsLocked(false);
   };
@@ -2223,11 +2267,13 @@ export default function App() {
         </div>
         <div className="absolute left-0 right-0 bottom-0 p-4 bg-white/85 border-t border-swiss-black/10 backdrop-blur">
           <button
-            onClick={() => setAiConfirmOpen(true)}
-            disabled={blocks.length === 0 || aiGenerating}
+            onClick={openAiPreviewConfirm}
+            disabled={blocks.length === 0 || aiGenerating || aiPreparingPreview}
             className="w-full h-11 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
           >
-            {aiGenerating
+            {aiPreparingPreview
+              ? (language === 'zh' ? '正在截取画板...' : 'Capturing Canvas...')
+              : aiGenerating
               ? (language === 'zh' ? 'AI 正在生成...' : 'AI Generating...')
               : (language === 'zh' ? 'AI 预览生成' : 'AI Preview Generate')}
           </button>
@@ -2249,6 +2295,7 @@ export default function App() {
         >
           {/* Frame Workspace */}
           <div 
+            ref={boardCaptureRef}
             className={`absolute left-0 top-0 bg-white overflow-hidden transition-all duration-300 ease-out ${
               aiGenerating
                 ? 'shadow-[0_0_44px_rgba(255,51,51,0.45)] ring-2 ring-swiss-red/45 animate-pulse'
@@ -2285,6 +2332,7 @@ export default function App() {
             >
               {selectionBox && (
                 <div
+                  data-ai-capture-ignore="true"
                   className="absolute z-[70] pointer-events-none border border-swiss-red bg-swiss-red/10"
                   style={selectionBox}
                 />
@@ -3008,14 +3056,14 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[90] bg-black/35 backdrop-blur-[2px] flex items-center justify-center px-6"
-            onMouseDown={() => setAiConfirmOpen(false)}
+            onMouseDown={closeAiConfirm}
           >
             <motion.div
               initial={{ y: 14, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 14, opacity: 0 }}
               onMouseDown={(event) => event.stopPropagation()}
-              className="w-[460px] bg-white border border-swiss-black/10 shadow-2xl p-6"
+              className="w-[720px] max-w-[calc(100vw-48px)] bg-white border border-swiss-black/10 shadow-2xl p-6"
             >
               <div className="flex items-start justify-between gap-5">
                 <div>
@@ -3029,12 +3077,24 @@ export default function App() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setAiConfirmOpen(false)}
+                  onClick={closeAiConfirm}
                   className="w-8 h-8 border border-swiss-black/10 flex items-center justify-center hover:bg-swiss-red hover:text-white transition-colors"
                 >
                   <X size={14} />
                 </button>
               </div>
+              {aiPendingBoardImage && (
+                <div className="mt-5 border border-swiss-black/10 bg-swiss-grey-canvas p-3">
+                  <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-swiss-black/45">
+                    {language === 'zh' ? '将发送给 AI 的真实画板截图' : 'Actual canvas image sent to AI'}
+                  </div>
+                  <img
+                    src={aiPendingBoardImage}
+                    alt="Canvas image to send to AI"
+                    className="w-full max-h-[46vh] object-contain bg-white"
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2 mt-6">
                 <button
                   onClick={startAiPreviewGeneration}
@@ -3043,7 +3103,7 @@ export default function App() {
                   {language === 'zh' ? '继续' : 'Continue'}
                 </button>
                 <button
-                  onClick={() => setAiConfirmOpen(false)}
+                  onClick={closeAiConfirm}
                   className="h-11 bg-white border border-swiss-black/10 text-swiss-black/55 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
                 >
                   {language === 'zh' ? '我想继续调整' : 'Keep Adjusting'}
@@ -3272,7 +3332,7 @@ function GridView({
       ? 'bg-swiss-red/35'
       : 'bg-swiss-red/45';
   return (
-    <div className="absolute inset-0 pointer-events-none select-none">
+    <div data-ai-capture-ignore="true" className="absolute inset-0 pointer-events-none select-none">
       <div className="absolute inset-0 border border-transparent opacity-0" style={{ margin: metrics.margin - 1 }} />
       {showBaseline && (
         <div
