@@ -1406,6 +1406,52 @@ export default function App() {
     }));
   };
 
+  const hasUnsupportedCanvasColor = (value: string) => (
+    value.includes('oklab(') ||
+    value.includes('oklch(') ||
+    value.includes('color-mix(')
+  );
+
+  const fallbackColorForElement = (element: Element, property: 'text' | 'background' | 'border') => {
+    const className = typeof element.className === 'string' ? element.className : '';
+    if (className.includes('swiss-red')) return property === 'background' ? '#FF3333' : '#FF3333';
+    if (className.includes('swiss-black')) return property === 'background' ? '#111111' : '#111111';
+    if (className.includes('swiss-grey-canvas')) return '#D6D6D6';
+    if (className.includes('swiss-grey-base')) return '#EBEBEB';
+    if (className.includes('white')) return property === 'text' ? '#111111' : '#FFFFFF';
+    if (property === 'text') return '#111111';
+    if (property === 'border') return 'rgba(0, 0, 0, 0.12)';
+    return 'transparent';
+  };
+
+  const safeCanvasColor = (
+    element: Element,
+    value: string,
+    property: 'text' | 'background' | 'border'
+  ) => {
+    if (!value || hasUnsupportedCanvasColor(value)) return fallbackColorForElement(element, property);
+    return value;
+  };
+
+  const sanitizeClonedCanvasColors = (document: Document, clonedRoot: HTMLElement) => {
+    const clonedElements = [clonedRoot, ...Array.from(clonedRoot.querySelectorAll<HTMLElement>('*'))];
+    clonedElements.forEach(element => {
+      const computed = document.defaultView?.getComputedStyle(element);
+      if (!computed) return;
+
+      element.style.color = safeCanvasColor(element, computed.color, 'text');
+      element.style.backgroundColor = safeCanvasColor(element, computed.backgroundColor, 'background');
+      element.style.borderTopColor = safeCanvasColor(element, computed.borderTopColor, 'border');
+      element.style.borderRightColor = safeCanvasColor(element, computed.borderRightColor, 'border');
+      element.style.borderBottomColor = safeCanvasColor(element, computed.borderBottomColor, 'border');
+      element.style.borderLeftColor = safeCanvasColor(element, computed.borderLeftColor, 'border');
+      element.style.outlineColor = safeCanvasColor(element, computed.outlineColor, 'border');
+      element.style.boxShadow = hasUnsupportedCanvasColor(computed.boxShadow) ? 'none' : computed.boxShadow;
+      element.style.textShadow = hasUnsupportedCanvasColor(computed.textShadow) ? 'none' : computed.textShadow;
+      element.style.backgroundImage = hasUnsupportedCanvasColor(computed.backgroundImage) ? 'none' : computed.backgroundImage;
+    });
+  };
+
   const captureCurrentBoardJpeg = async () => {
     const node = boardCaptureRef.current;
     if (!node) {
@@ -1436,11 +1482,12 @@ export default function App() {
         ignoreElements: element => {
           return element instanceof HTMLElement && element.dataset.aiCaptureIgnore === 'true';
         },
-        onclone: (_document, clonedElement) => {
+        onclone: (clonedDocument, clonedElement) => {
           const clonedNode = clonedElement as HTMLElement;
           clonedNode.style.transform = 'none';
           clonedNode.style.transformOrigin = 'top left';
           clonedNode.style.boxShadow = 'none';
+          sanitizeClonedCanvasColors(clonedDocument, clonedNode);
         }
       });
       return canvas.toDataURL('image/jpeg', 0.95);
