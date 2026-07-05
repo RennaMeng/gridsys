@@ -1,11 +1,11 @@
 import { TemplateJSON, TemplateManifest } from './templateTypes';
 
 const DEFAULT_TEMPLATE_IDS = [
-  'discover_context_mapping_16x9',
-  'discover_long_medical_strip',
-  'define_concept_sketch_long_16x9',
-  'develop_prototype_demo_16x9',
-  'deliver_final_outcome_16x9'
+  'discover_16x9.context_mapping',
+  'discover_1800x768.long_medical_strip',
+  'define_16x9.concept_sketch_long',
+  'develop_16x9.prototype_demo',
+  'deliver_16x9.final_outcome'
 ];
 
 export async function loadTemplate(templateId: string): Promise<TemplateJSON> {
@@ -42,5 +42,5 @@ export async function loadTemplateManifest(): Promise<TemplateManifest> {
 export async function loadAllTemplates(): Promise<TemplateJSON[]> {
   const manifest = await loadTemplateManifest();
   const templateIds = manifest.templates.map(template => template.templateId);
-  return loadTemplates(templateIds.length ? templateIds : DEFAULT_TEMPLATE_IDS);
+  return loadTemplates(templateIds);
 }

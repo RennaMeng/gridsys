@@ -1,131 +1,18 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-27T13:20:22.520Z",
+  "generatedAt": "2026-07-05T00:00:00.000Z",
   "templates": [
     {
-      "templateId": "discover_context_mapping_16x9",
-      "stage": "discover",
-      "templateName": "Discover Reference Mapping"
+      "templateId": "a3_landscape_board_04",
+      "stage": "general",
+      "templateName": "A3 Landscape Board 04",
+      "source": "Figma node 19:887 / A3横向展板模板-04 2"
     },
     {
-      "templateId": "define_concept_sketch_long_16x9",
-      "stage": "define",
-      "templateName": "Define Concept Sketch Long Board",
-      "source": "defineconcept(long).json",
-      "profile": {
-        "stage": "define",
-        "pageIntent": [
-          "design concept",
-          "relationship diagram",
-          "interaction principle",
-          "system mechanism",
-          "design sketch sequence"
-        ],
-        "canvas": {
-          "ratio": "16:9",
-          "orientation": "landscape"
-        },
-        "structure": {
-          "sectionCount": 2,
-          "textSlotCount": 11,
-          "imageSlotCount": 6,
-          "chartSlotCount": 0,
-          "dataPointCount": 0,
-          "stepCount": 10,
-          "comparisonCount": 0,
-          "density": "medium",
-          "hasHeroImage": false,
-          "hasBigImage": false,
-          "hasProcessFlow": true,
-          "hasSketchArea": true
-        },
-        "strengths": [
-          "clear two-column concept and sketch structure",
-          "supports relationship diagrams and interaction principles",
-          "supports step-based design sketch diagrams",
-          "supports process or experiment sequence"
-        ],
-        "risks": [
-          "many small text slots require concise copy",
-          "best results need enough visual assets for process and experiment slots"
-        ],
-        "bestFor": [
-          "define pages focused on solution sketches",
-          "design concept pages with diagrams and step sketches",
-          "relationship, mechanism, and interaction principle explanation",
-          "process-chain explanation"
-        ],
-        "avoidFor": [
-          "photo-only moodboards with almost no text",
-          "final outcome pages that need validation feedback",
-          "content with very long narrative paragraphs"
-        ]
-      }
-    },
-    {
-      "templateId": "discover_long_medical_strip",
-      "stage": "discover",
-      "templateName": "Discover Long Medical Strip",
-      "source": "long_medical.json",
-      "profile": {
-        "stage": "discover",
-        "pageIntent": [
-          "long-format research report",
-          "background evidence",
-          "data visualization",
-          "interview insights",
-          "field research"
-        ],
-        "canvas": {
-          "ratio": "1800:768",
-          "orientation": "landscape"
-        },
-        "structure": {
-          "sectionCount": 3,
-          "textSlotCount": 24,
-          "imageSlotCount": 11,
-          "chartSlotCount": 0,
-          "dataPointCount": 6,
-          "stepCount": 1,
-          "comparisonCount": 0,
-          "density": "high",
-          "hasHeroImage": false,
-          "hasBigImage": false,
-          "hasProcessFlow": false,
-          "hasSketchArea": false
-        },
-        "strengths": [
-          "three-column long-format research report structure",
-          "supports dense background, research, and interview evidence",
-          "supports charts, diagrams, and participant evidence as visual slots",
-          "supports source-to-impact or behavior sequence"
-        ],
-        "risks": [
-          "many small text slots require concise copy",
-          "best results need enough visual assets for process and experiment slots"
-        ],
-        "bestFor": [
-          "discover pages focused on background research",
-          "long strip canvases with dense research evidence",
-          "data-heavy reports with interviews or user narratives",
-          "process-chain explanation"
-        ],
-        "avoidFor": [
-          "photo-only moodboards with almost no text",
-          "final outcome pages that need validation feedback",
-          "content with very long narrative paragraphs"
-        ]
-      }
-    },
-    {
-      "templateId": "develop_prototype_demo_16x9",
-      "stage": "develop",
-      "templateName": "Develop Prototype Demonstration Layout"
-    },
-    {
-      "templateId": "deliver_final_outcome_16x9",
-      "stage": "deliver",
-      "templateName": "Deliver Final Outcome"
+      "templateId": "a3_landscape_board_05",
+      "stage": "general",
+      "templateName": "A3 Landscape Board 05",
+      "source": "A3横向展板模板-05 1.jpg"
     }
   ]
 }

@@ -7,9 +7,9 @@ const outputDir = path.join(rootDir, 'public', 'templates');
 const manifestPath = path.join(outputDir, 'template-manifest.json');
 
 const existingTemplates = [
-  'discover_context_mapping_16x9',
-  'develop_prototype_demo_16x9',
-  'deliver_final_outcome_16x9'
+  'discover_16x9.context_mapping',
+  'develop_16x9.prototype_demo',
+  'deliver_16x9.final_outcome'
 ];
 
 const stageFromName = (fileName, raw) => {
@@ -415,11 +415,11 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
 
   const templateId = stage === 'discover'
     ? variant === 'medical'
-      ? 'discover_long_medical_strip'
-      : 'discover_long_big_image_16x9'
+      ? 'discover_1800x768.long_medical_strip'
+      : 'discover_16x9.long_big_image'
     : variant === 'concept'
-      ? 'define_concept_sketch_long_16x9'
-      : 'define_solution_sketch_long_16x9';
+      ? 'define_16x9.concept_sketch_long'
+      : 'define_16x9.solution_sketch_long';
   const templateProfile = buildTemplateProfile(stage, elements, sections, variant);
   const templateName = stage === 'discover'
     ? variant === 'medical'
@@ -512,7 +512,7 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
       visualDensity: templateProfile.structure.density,
       layoutStyle: stage === 'discover'
         ? variant === 'medical'
-          ? 'discover_long_medical_strip'
+          ? 'discover_1800x768.long_medical_strip'
           : 'discover_long_big_image_board'
         : variant === 'concept'
           ? 'define_concept_sketch_board'
@@ -543,7 +543,7 @@ const buildLongBigImageTemplate = (raw, sourceFile, stage) => {
       {
         variantId: stage === 'discover'
           ? variant === 'medical'
-            ? 'discover_long_medical_strip'
+            ? 'discover_1800x768.long_medical_strip'
             : 'discover_long_big_image_board'
           : variant === 'concept'
             ? 'define_concept_sketch_long_board'
@@ -584,7 +584,7 @@ const buildManifest = async (processedTemplates) => {
     version: 1,
     generatedAt: new Date().toISOString(),
     templates: [
-      baseItems.find(item => item.templateId === 'discover_context_mapping_16x9'),
+      baseItems.find(item => item.templateId === 'discover_16x9.context_mapping'),
       ...processedTemplates.map(template => ({
         templateId: template.templateMeta.templateId,
         stage: template.templateMeta.doubleDiamondStage,
@@ -592,8 +592,8 @@ const buildManifest = async (processedTemplates) => {
         source: template.templateMeta.source,
         profile: template.templateProfile
       })),
-      baseItems.find(item => item.templateId === 'develop_prototype_demo_16x9'),
-      baseItems.find(item => item.templateId === 'deliver_final_outcome_16x9')
+      baseItems.find(item => item.templateId === 'develop_16x9.prototype_demo'),
+      baseItems.find(item => item.templateId === 'deliver_16x9.final_outcome')
     ].filter(Boolean)
   };
 };

@@ -1,0 +1,1059 @@
+{
+  "templateMeta": {
+    "templateId": "a3_landscape_board_05",
+    "templateName": "A3 Landscape Board 05",
+    "pageType": "presentation_board",
+    "doubleDiamondStage": "general",
+    "layoutPurpose": "a3_landscape_annotated_text_image_board",
+    "narrativeRole": "combine_left_text_explanation_with_right_semantic_image_evidence",
+    "suitableFor": [
+      "A3 landscape exhibition board",
+      "portfolio board",
+      "design research summary",
+      "process documentation",
+      "captioned visual evidence layout"
+    ],
+    "source": "A3横向展板模板-05 1-2.jpg",
+    "revisionNote": "Updated from newly annotated source image; slots are semantic regions rather than every visible grid cell."
+  },
+  "templateProfile": {
+    "stage": "general",
+    "pageIntent": [
+      "structured title and explanatory copy",
+      "few large image evidence regions",
+      "short caption strips",
+      "baseline-aligned presentation board"
+    ],
+    "canvas": {
+      "format": "A3",
+      "ratio": "420:297",
+      "orientation": "landscape"
+    },
+    "structure": {
+      "sectionCount": 2,
+      "groupCount": 6,
+      "textSlotCount": 3,
+      "imageSlotCount": 5,
+      "captionSlotCount": 3,
+      "density": "medium",
+      "hasHeroImage": false,
+      "hasBigImage": true,
+      "hasProcessFlow": false,
+      "hasCaptionRows": true
+    },
+    "strengths": [
+      "strict 6x6 modular structure with a clear left text field and right image field",
+      "large visual slots prevent over-fragmented image assignment",
+      "caption strips are reserved only where the annotated source marks them",
+      "A3 margins and 12 pt baseline rhythm are explicit for print conversion"
+    ],
+    "risks": [
+      "left body copy should stay concise because the source uses small 8 pt body text",
+      "top image slots work best with simple details or cropped process images",
+      "large lower image needs a wide source asset or a crop-tolerant composition"
+    ],
+    "bestFor": [
+      "portfolio evidence boards",
+      "research process boards with a few key visuals",
+      "case-study boards combining short copy with captioned images"
+    ],
+    "avoidFor": [
+      "single hero-image presentation",
+      "long-form essay layouts",
+      "layouts requiring many separate thumbnails"
+    ]
+  },
+  "canvas": {
+    "format": "A3",
+    "orientation": "landscape",
+    "unit": "pt",
+    "width": 1190.55,
+    "height": 841.89,
+    "ratio": "420:297",
+    "backgroundColor": "#FFFFFF",
+    "print": {
+      "paperSize": "A3",
+      "widthMm": 420,
+      "heightMm": 297,
+      "bleed": 0,
+      "safeArea": {
+        "top": 48,
+        "right": 48,
+        "bottom": 48,
+        "left": 48
+      }
+    }
+  },
+  "grid": {
+    "type": "strict_modular_grid",
+    "columns": 6,
+    "rows": 6,
+    "columnGap": 17.94,
+    "rowGap": 31.25,
+    "margin": 48,
+    "margins": {
+      "top": 48,
+      "right": 48,
+      "bottom": 48,
+      "left": 48,
+      "inner": 48,
+      "outer": 48
+    },
+    "edgeDistances": {
+      "topToLiveArea": 48,
+      "rightToLiveArea": 48,
+      "bottomToLiveArea": 48,
+      "leftToLiveArea": 48
+    },
+    "liveArea": {
+      "x": 48,
+      "y": 48,
+      "w": 1094.55,
+      "h": 745.89
+    },
+    "module": {
+      "w": 167.49,
+      "h": 98.27,
+      "note": "Nominal module size after subtracting visible gutters. Use grid.guides for exact annotated guide rendering."
+    },
+    "layoutDensity": "medium",
+    "alignment": "baseline_modular",
+    "coordinateSystem": "6x6_grid",
+    "futureCoordinateSystem": {
+      "preferredConversion": "24x16_grid",
+      "columnMultiplier": 4,
+      "rowScale": 2.6667,
+      "notes": "Primary x/y/w/h values use the visible 6x6 source grid. Multiply x and w by 4 for 24-column conversion; remap y and h proportionally to 16 rows while preserving caption band metadata."
+    },
+    "baseline": {
+      "unit": "pt",
+      "increment": 12,
+      "startOffset": 0,
+      "guideColor": "#B8B8B8",
+      "alignTextToBaseline": true,
+      "alignImagesToBaseline": true
+    },
+    "guides": {
+      "unit": "pt",
+      "origin": "liveArea",
+      "source": "annotated_reference_image",
+      "guideColor": "#F16B6B",
+      "baselineGuideColor": "#B8B8B8",
+      "notes": "Positions are measured relative to the liveArea origin and preserve the annotated image's visible module boundaries, gutter double-lines, caption bands, and bottom strip. Web previews should draw these guides directly instead of assuming an even 6x6 fill.",
+      "vertical": [
+        {
+          "position": 0,
+          "kind": "liveArea_edge",
+          "label": "left margin edge"
+        },
+        {
+          "position": 167.49,
+          "kind": "module_boundary",
+          "label": "column 1 right edge"
+        },
+        {
+          "position": 185.43,
+          "kind": "gutter_boundary",
+          "label": "column 2 left edge",
+          "gutterFromPrevious": 17.94
+        },
+        {
+          "position": 352.92,
+          "kind": "module_boundary",
+          "label": "column 2 right edge"
+        },
+        {
+          "position": 370.86,
+          "kind": "gutter_boundary",
+          "label": "column 3 left edge",
+          "gutterFromPrevious": 17.94
+        },
+        {
+          "position": 538.35,
+          "kind": "module_boundary",
+          "label": "column 3 right edge"
+        },
+        {
+          "position": 556.29,
+          "kind": "gutter_boundary",
+          "label": "column 4 left edge",
+          "gutterFromPrevious": 17.94
+        },
+        {
+          "position": 723.78,
+          "kind": "module_boundary",
+          "label": "column 4 right edge"
+        },
+        {
+          "position": 741.72,
+          "kind": "gutter_boundary",
+          "label": "column 5 left edge",
+          "gutterFromPrevious": 17.94
+        },
+        {
+          "position": 909.21,
+          "kind": "module_boundary",
+          "label": "column 5 right edge"
+        },
+        {
+          "position": 927.15,
+          "kind": "gutter_boundary",
+          "label": "column 6 left edge",
+          "gutterFromPrevious": 17.94
+        },
+        {
+          "position": 1094.55,
+          "kind": "liveArea_edge",
+          "label": "right margin edge"
+        }
+      ],
+      "verticalGutters": [
+        {
+          "from": 167.49,
+          "to": 185.43,
+          "width": 17.94,
+          "between": "columns_1_2"
+        },
+        {
+          "from": 352.92,
+          "to": 370.86,
+          "width": 17.94,
+          "between": "columns_2_3"
+        },
+        {
+          "from": 538.35,
+          "to": 556.29,
+          "width": 17.94,
+          "between": "columns_3_4"
+        },
+        {
+          "from": 723.78,
+          "to": 741.72,
+          "width": 17.94,
+          "between": "columns_4_5"
+        },
+        {
+          "from": 909.21,
+          "to": 927.15,
+          "width": 17.94,
+          "between": "columns_5_6"
+        }
+      ],
+      "horizontal": [
+        {
+          "position": 0,
+          "kind": "liveArea_edge",
+          "label": "top margin edge"
+        },
+        {
+          "position": 93.79,
+          "kind": "module_boundary",
+          "label": "top image band bottom"
+        },
+        {
+          "position": 125.04,
+          "kind": "gutter_boundary",
+          "label": "row 2 top edge",
+          "gutterFromPrevious": 31.25
+        },
+        {
+          "position": 220.91,
+          "kind": "module_boundary",
+          "label": "row 2 content bottom"
+        },
+        {
+          "position": 251.11,
+          "kind": "gutter_boundary",
+          "label": "row 3 top edge",
+          "gutterFromPrevious": 30.2
+        },
+        {
+          "position": 343.86,
+          "kind": "module_boundary",
+          "label": "row 3 content bottom"
+        },
+        {
+          "position": 375.11,
+          "kind": "gutter_boundary",
+          "label": "row 4 top edge",
+          "gutterFromPrevious": 31.25
+        },
+        {
+          "position": 469.94,
+          "kind": "module_boundary",
+          "label": "row 4 content bottom"
+        },
+        {
+          "position": 501.19,
+          "kind": "gutter_boundary",
+          "label": "row 5 top edge",
+          "gutterFromPrevious": 31.25
+        },
+        {
+          "position": 594.98,
+          "kind": "module_boundary",
+          "label": "row 5 content bottom"
+        },
+        {
+          "position": 625.18,
+          "kind": "gutter_boundary",
+          "label": "row 6 top edge",
+          "gutterFromPrevious": 30.2
+        },
+        {
+          "position": 722.97,
+          "kind": "caption_strip_boundary",
+          "label": "bottom caption strip top"
+        },
+        {
+          "position": 745.89,
+          "kind": "liveArea_edge",
+          "label": "bottom margin edge"
+        }
+      ],
+      "horizontalGutters": [
+        {
+          "from": 93.79,
+          "to": 125.04,
+          "height": 31.25,
+          "between": "rows_1_2"
+        },
+        {
+          "from": 220.91,
+          "to": 251.11,
+          "height": 30.2,
+          "between": "rows_2_3"
+        },
+        {
+          "from": 343.86,
+          "to": 375.11,
+          "height": 31.25,
+          "between": "rows_3_4"
+        },
+        {
+          "from": 469.94,
+          "to": 501.19,
+          "height": 31.25,
+          "between": "rows_4_5"
+        },
+        {
+          "from": 594.98,
+          "to": 625.18,
+          "height": 30.2,
+          "between": "rows_5_6"
+        }
+      ],
+      "horizontalBands": [
+        {
+          "from": 0,
+          "to": 93.79,
+          "kind": "content_band",
+          "label": "top title and small images"
+        },
+        {
+          "from": 93.79,
+          "to": 125.04,
+          "kind": "caption_or_gutter_band",
+          "label": "top annotation strip"
+        },
+        {
+          "from": 125.04,
+          "to": 220.91,
+          "kind": "content_band",
+          "label": "short text and upper middle image band"
+        },
+        {
+          "from": 220.91,
+          "to": 251.11,
+          "kind": "gutter_band",
+          "label": "row 2 lower spacing"
+        },
+        {
+          "from": 251.11,
+          "to": 343.86,
+          "kind": "content_band",
+          "label": "paragraph and middle image band"
+        },
+        {
+          "from": 343.86,
+          "to": 375.11,
+          "kind": "caption_or_gutter_band",
+          "label": "middle annotation strip"
+        },
+        {
+          "from": 375.11,
+          "to": 469.94,
+          "kind": "reserve_band",
+          "label": "unassigned grid reserve"
+        },
+        {
+          "from": 469.94,
+          "to": 501.19,
+          "kind": "gutter_band",
+          "label": "lower image top spacing"
+        },
+        {
+          "from": 501.19,
+          "to": 722.97,
+          "kind": "content_band",
+          "label": "large lower image area"
+        },
+        {
+          "from": 722.97,
+          "to": 745.89,
+          "kind": "caption_strip",
+          "label": "bottom annotation strip"
+        }
+      ]
+    }
+  },
+  "layoutRules": {
+    "density": "medium",
+    "alignToGrid": true,
+    "alignToBaseline": true,
+    "preserveTemplateGeometry": true,
+    "avoidProjectSpecificCopy": true,
+    "avoidFragmentedSlots": true,
+    "preferredReadingOrder": "title_then_two_short_body_notes_then_left_paragraphs_then_right_images_top_to_bottom",
+    "imageStrategy": "Use only the marked image color blocks. Image 1, Image 2, and Image 3 align to explicit grid.guide frame coordinates; do not infer heights from fractional 6x6 spans.",
+    "textStrategy": "Use one whole text frame per left column. Do not split the left text blocks vertically; body copy fills text_block_left first, then text_block_right.",
+    "captionStrategy": "Caption/annotation strips occupy gutter bands between modules and align to grid.guides horizontal band boundaries.",
+    "margins": {
+      "top": 48,
+      "right": 48,
+      "bottom": 48,
+      "left": 48,
+      "inner": 48,
+      "outer": 48
+    },
+    "placeholderColorMeaning": {
+      "pink": "text area or text spacing placeholder",
+      "gray": "image area or image placeholder",
+      "narrowRows": "caption or annotation bands"
+    },
+    "baselineRules": {
+      "bodyFontSize": 8,
+      "annotationFontSize": 8,
+      "lineHeight": 12,
+      "baselineIncrement": 12,
+      "baselineGuideColor": "#B8B8B8",
+      "textAlignsToBaseline": true,
+      "imageEdgesAlignToBaseline": true
+    },
+    "assignmentRules": {
+      "maxImageFillCount": 5,
+      "maxTextFillCount": 5,
+      "maxCaptionFillCount": 3,
+      "doNotSplitLargeImagesIntoCells": true,
+      "emptyOptionalSlotsMayRemainBlank": true
+    }
+  },
+  "designSystem": {
+    "summary": "A3 landscape exhibition-board template with a compact left text field and a right image field built from a few annotated visual regions, organized by a strict 6x6 grid and 12 pt gray baseline.",
+    "typography": {
+      "body": {
+        "fontSize": 8,
+        "lineHeight": 12
+      },
+      "annotation": {
+        "fontSize": 8,
+        "lineHeight": 12
+      },
+      "headingScale": {
+        "h1": 68,
+        "h2": 56,
+        "h3": 44,
+        "h4": 32,
+        "h5": 20
+      }
+    },
+    "colorLogic": {
+      "background": "#FFFFFF",
+      "textPlaceholder": "#F7E8E8",
+      "imagePlaceholder": "#E9E9E9",
+      "constructionLines": "#F16B6B",
+      "baselineGuide": "#B8B8B8",
+      "titleHighlight": "#F3B6D8"
+    },
+    "spacing": {
+      "baseline": 12,
+      "outerMargin": 48,
+      "innerMargin": 48,
+      "textPadding": 0,
+      "captionPadding": 0
+    }
+  },
+  "sections": [
+    {
+      "id": "left_text_field",
+      "label": "Left Text Field",
+      "purpose": "Hold the h5 title and compact explanatory copy in the pink source regions.",
+      "slots": [
+        "board_title_h5",
+        "short_body_left",
+        "short_body_right",
+        "paragraph_left",
+        "paragraph_right"
+      ]
+    },
+    {
+      "id": "right_image_field",
+      "label": "Right Image Field",
+      "purpose": "Hold the image regions and caption strips explicitly marked in the gray source area.",
+      "slots": [
+        "image_top_left",
+        "image_top_right",
+        "caption_top_left",
+        "image_mid_wide",
+        "image_right_tall",
+        "caption_mid_wide",
+        "image_lower_wide",
+        "caption_lower_left"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": "top_title_and_small_images",
+      "label": "Top Title And Small Images",
+      "x": 0,
+      "y": 0,
+      "w": 4,
+      "h": 1,
+      "slots": [
+        "board_title_h5",
+        "image_top_left",
+        "image_top_right",
+        "caption_top_left"
+      ]
+    },
+    {
+      "id": "left_short_body_notes",
+      "label": "Left Short Body Notes",
+      "x": 0,
+      "y": 1,
+      "w": 2,
+      "h": 1,
+      "slots": [
+        "short_body_left",
+        "short_body_right"
+      ]
+    },
+    {
+      "id": "left_paragraph_blocks",
+      "label": "Left Paragraph Blocks",
+      "x": 0,
+      "y": 2,
+      "w": 2,
+      "h": 1,
+      "slots": [
+        "paragraph_left",
+        "paragraph_right"
+      ]
+    },
+    {
+      "id": "middle_image_band",
+      "label": "Middle Image Band",
+      "x": 2,
+      "y": 1,
+      "w": 4,
+      "h": 2,
+      "slots": [
+        "image_mid_wide",
+        "image_right_tall",
+        "caption_mid_wide"
+      ]
+    },
+    {
+      "id": "lower_large_image_band",
+      "label": "Lower Large Image Band",
+      "x": 2,
+      "y": 4,
+      "w": 4,
+      "h": 2,
+      "slots": [
+        "image_lower_wide",
+        "caption_lower_left"
+      ]
+    },
+    {
+      "id": "unassigned_grid_reserve",
+      "label": "Unassigned Grid Reserve",
+      "x": 0,
+      "y": 3,
+      "w": 6,
+      "h": 1,
+      "slots": [],
+      "purpose": "Visible source-grid breathing room; not a content slot unless a future annotation marks it."
+    }
+  ],
+  "elements": [
+    {
+      "slotId": "board_title_h5",
+      "type": "text",
+      "role": "title",
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 0.22,
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 167.49,
+        "h": 24,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "h5",
+      "zIndex": 4,
+      "required": true,
+      "priority": "required",
+      "order": 1,
+      "maxFillCount": 1,
+      "placeholderLabel": "标题 H5",
+      "placeholderColor": "transparent",
+      "contentSummary": "H5 board title in the top-left title strip.",
+      "textRules": {
+        "maxChars": 28,
+        "fontSize": 20,
+        "lineHeight": 24,
+        "lineClamp": 1,
+        "overflow": "clip",
+        "padding": 0,
+        "baselineAligned": true
+      }
+    },
+    {
+      "slotId": "text_block_left",
+      "type": "text",
+      "role": "body_text_1",
+      "x": 0,
+      "y": 1,
+      "w": 1,
+      "h": 2,
+      "frame": {
+        "x": 0,
+        "y": 125.04,
+        "w": 167.49,
+        "h": 218.82,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "body",
+      "zIndex": 4,
+      "required": false,
+      "priority": "high",
+      "order": 2,
+      "maxFillCount": 1,
+      "placeholderLabel": "文本",
+      "placeholderColor": "transparent",
+      "contentSummary": "Whole left body text frame. Body assets fill this first.",
+      "textRules": {
+        "maxChars": 220,
+        "fontSize": 8,
+        "lineHeight": 12,
+        "lineClamp": 18,
+        "overflow": "clip",
+        "padding": 0,
+        "baselineAligned": true
+      }
+    },
+    {
+      "slotId": "text_block_right",
+      "type": "text",
+      "role": "body_text_2",
+      "x": 1,
+      "y": 1,
+      "w": 1,
+      "h": 2,
+      "frame": {
+        "x": 185.43,
+        "y": 125.04,
+        "w": 167.49,
+        "h": 218.82,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "body",
+      "zIndex": 4,
+      "required": false,
+      "priority": "high",
+      "order": 3,
+      "maxFillCount": 1,
+      "placeholderLabel": "文本",
+      "placeholderColor": "transparent",
+      "contentSummary": "Whole right body text frame. Body assets fill this after text_block_left.",
+      "textRules": {
+        "maxChars": 220,
+        "fontSize": 8,
+        "lineHeight": 12,
+        "lineClamp": 18,
+        "overflow": "clip",
+        "padding": 0,
+        "baselineAligned": true
+      }
+    },
+    {
+      "slotId": "image_top_left",
+      "type": "image",
+      "role": "top_small_image",
+      "x": 2,
+      "y": 0,
+      "w": 1,
+      "h": 1,
+      "frame": {
+        "x": 370.86,
+        "y": 0,
+        "w": 167.49,
+        "h": 93.79,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false,
+      "priority": "medium",
+      "order": 4,
+      "maxFillCount": 1,
+      "acceptedAspectRatio": "landscape",
+      "aspectRatioHint": 1.79,
+      "placeholderLabel": "图片",
+      "placeholderColor": "#E9E9E9",
+      "contentSummary": "Top small landscape image slot."
+    },
+    {
+      "slotId": "image_top_right",
+      "type": "image",
+      "role": "top_small_image",
+      "x": 3,
+      "y": 0,
+      "w": 1,
+      "h": 1,
+      "frame": {
+        "x": 556.29,
+        "y": 0,
+        "w": 167.49,
+        "h": 93.79,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false,
+      "priority": "medium",
+      "order": 5,
+      "maxFillCount": 1,
+      "acceptedAspectRatio": "landscape",
+      "aspectRatioHint": 1.79,
+      "placeholderLabel": "图片",
+      "placeholderColor": "#E9E9E9",
+      "contentSummary": "Second top small landscape image slot."
+    },
+    {
+      "slotId": "caption_top",
+      "type": "annotation",
+      "role": "caption",
+      "x": 2,
+      "y": 0.75,
+      "w": 2,
+      "h": 0.25,
+      "frame": {
+        "x": 370.86,
+        "y": 93.79,
+        "w": 352.92,
+        "h": 31.25,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "annotation",
+      "zIndex": 5,
+      "required": false,
+      "priority": "low",
+      "order": 6,
+      "maxFillCount": 1,
+      "placeholderLabel": "注释",
+      "placeholderColor": "transparent",
+      "contentSummary": "Top caption strip occupying the gutter band below the small images.",
+      "textRules": {
+        "maxChars": 90,
+        "fontSize": 8,
+        "lineHeight": 12,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 0,
+        "baselineAligned": true
+      }
+    },
+    {
+      "slotId": "image_1_mid",
+      "type": "image",
+      "role": "image_1",
+      "x": 2,
+      "y": 1,
+      "w": 2,
+      "h": 2,
+      "frame": {
+        "x": 370.86,
+        "y": 125.04,
+        "w": 352.92,
+        "h": 218.82,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false,
+      "priority": "high",
+      "order": 7,
+      "maxFillCount": 1,
+      "acceptedAspectRatio": "landscape",
+      "aspectRatioHint": 1.61,
+      "placeholderLabel": "图片1",
+      "placeholderColor": "#E9E9E9",
+      "contentSummary": "Image 1 middle block, aligned to guide lines."
+    },
+    {
+      "slotId": "image_2_right",
+      "type": "image",
+      "role": "image_2",
+      "x": 4,
+      "y": 0,
+      "w": 2,
+      "h": 3,
+      "frame": {
+        "x": 741.72,
+        "y": 0,
+        "w": 352.83,
+        "h": 343.86,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false,
+      "priority": "high",
+      "order": 8,
+      "maxFillCount": 1,
+      "acceptedAspectRatio": "portrait_or_square",
+      "aspectRatioHint": 1.03,
+      "placeholderLabel": "图片2",
+      "placeholderColor": "#E9E9E9",
+      "contentSummary": "Image 2 right block, spanning from the top band to the image 1 bottom guide."
+    },
+    {
+      "slotId": "caption_mid",
+      "type": "annotation",
+      "role": "caption",
+      "x": 2,
+      "y": 2.75,
+      "w": 3,
+      "h": 0.25,
+      "frame": {
+        "x": 370.86,
+        "y": 343.86,
+        "w": 538.35,
+        "h": 31.25,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "annotation",
+      "zIndex": 5,
+      "required": false,
+      "priority": "low",
+      "order": 9,
+      "maxFillCount": 1,
+      "placeholderLabel": "注释",
+      "placeholderColor": "transparent",
+      "contentSummary": "Middle caption strip occupying the gutter band under Image 1.",
+      "textRules": {
+        "maxChars": 90,
+        "fontSize": 8,
+        "lineHeight": 12,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 0,
+        "baselineAligned": true
+      }
+    },
+    {
+      "slotId": "image_3_lower",
+      "type": "image",
+      "role": "image_3",
+      "x": 2,
+      "y": 3,
+      "w": 4,
+      "h": 3,
+      "frame": {
+        "x": 370.86,
+        "y": 375.11,
+        "w": 723.69,
+        "h": 347.86,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "image",
+      "crop": "cover",
+      "zIndex": 1,
+      "required": false,
+      "priority": "primary",
+      "order": 10,
+      "maxFillCount": 1,
+      "acceptedAspectRatio": "panoramic_landscape",
+      "aspectRatioHint": 2.08,
+      "placeholderLabel": "图片3",
+      "placeholderColor": "#E9E9E9",
+      "contentSummary": "Large lower image block aligned to lower grid guide boundaries."
+    },
+    {
+      "slotId": "caption_lower",
+      "type": "annotation",
+      "role": "caption",
+      "x": 2,
+      "y": 5.75,
+      "w": 4,
+      "h": 0.25,
+      "frame": {
+        "x": 370.86,
+        "y": 722.97,
+        "w": 723.69,
+        "h": 22.92,
+        "unit": "pt",
+        "origin": "liveArea"
+      },
+      "style": "annotation",
+      "zIndex": 5,
+      "required": false,
+      "priority": "low",
+      "order": 11,
+      "maxFillCount": 1,
+      "placeholderLabel": "注释",
+      "placeholderColor": "transparent",
+      "contentSummary": "Bottom caption strip occupying the bottom gutter/caption band.",
+      "textRules": {
+        "maxChars": 90,
+        "fontSize": 8,
+        "lineHeight": 12,
+        "lineClamp": 2,
+        "overflow": "clip",
+        "padding": 0,
+        "baselineAligned": true
+      }
+    }
+  ],
+  "contentRequirements": {
+    "required": [
+      "board_title_h5"
+    ],
+    "optional": [
+      "text_block_left",
+      "text_block_right",
+      "image_top_left",
+      "image_top_right",
+      "caption_top",
+      "image_1_mid",
+      "image_2_right",
+      "caption_mid",
+      "image_3_lower",
+      "caption_lower"
+    ]
+  },
+  "slots": {
+    "textSlots": [
+      {
+        "id": "board_title_h5",
+        "role": "title",
+        "required": true,
+        "order": 1,
+        "maxFillCount": 1
+      },
+      {
+        "id": "text_block_left",
+        "role": "body_text_1",
+        "required": false,
+        "order": 2,
+        "maxFillCount": 1
+      },
+      {
+        "id": "text_block_right",
+        "role": "body_text_2",
+        "required": false,
+        "order": 3,
+        "maxFillCount": 1
+      }
+    ],
+    "imageSlots": [
+      {
+        "id": "image_top_left",
+        "role": "top_small_image",
+        "required": false,
+        "order": 4,
+        "maxFillCount": 1,
+        "acceptedAspectRatio": "landscape",
+        "aspectRatioHint": 1.79
+      },
+      {
+        "id": "image_top_right",
+        "role": "top_small_image",
+        "required": false,
+        "order": 5,
+        "maxFillCount": 1,
+        "acceptedAspectRatio": "landscape",
+        "aspectRatioHint": 1.79
+      },
+      {
+        "id": "image_1_mid",
+        "role": "image_1",
+        "required": false,
+        "order": 7,
+        "maxFillCount": 1,
+        "acceptedAspectRatio": "landscape",
+        "aspectRatioHint": 1.61
+      },
+      {
+        "id": "image_2_right",
+        "role": "image_2",
+        "required": false,
+        "order": 8,
+        "maxFillCount": 1,
+        "acceptedAspectRatio": "portrait_or_square",
+        "aspectRatioHint": 1.03
+      },
+      {
+        "id": "image_3_lower",
+        "role": "image_3",
+        "required": false,
+        "order": 10,
+        "maxFillCount": 1,
+        "acceptedAspectRatio": "panoramic_landscape",
+        "aspectRatioHint": 2.08
+      }
+    ],
+    "captionSlots": [
+      {
+        "id": "caption_top",
+        "role": "caption",
+        "required": false,
+        "order": 6,
+        "maxFillCount": 1
+      },
+      {
+        "id": "caption_mid",
+        "role": "caption",
+        "required": false,
+        "order": 9,
+        "maxFillCount": 1
+      },
+      {
+        "id": "caption_lower",
+        "role": "caption",
+        "required": false,
+        "order": 11,
+        "maxFillCount": 1
+      }
+    ]
+  }
+}

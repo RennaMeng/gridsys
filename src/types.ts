@@ -11,6 +11,14 @@ export interface LayoutBlock {
   y: number; // grid row start
   w: number; // grid col span
   h: number; // grid row span
+  frame?: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    unit?: 'pt' | 'px';
+    origin?: 'liveArea' | 'canvas';
+  };
   content?: string;
   category: 'Define' | 'Ideation' | 'Prototype' | 'Final' | 'Generic';
   assetId?: string;

@@ -4,6 +4,14 @@ export type TemplateId = string;
 
 export type TemplateStage = 'discover' | 'define' | 'develop' | 'deliver';
 
+export type TemplateGuide = number | {
+  position: number;
+  kind?: string;
+  label?: string;
+  color?: string;
+  gutterFromPrevious?: number;
+};
+
 export type TemplateJSON = {
   templateMeta: {
     templateId: string;
@@ -17,6 +25,10 @@ export type TemplateJSON = {
   templateProfile?: TemplateProfile;
   canvas: {
     ratio: string;
+    width?: number;
+    height?: number;
+    orientation?: string;
+    unit?: string;
   };
   grid: {
     columns: number;
@@ -24,6 +36,29 @@ export type TemplateJSON = {
     columnGap: number;
     rowGap: number;
     margin?: number;
+    margins?: Record<string, number>;
+    edgeDistances?: Record<string, number>;
+    liveArea?: { x: number; y: number; w: number; h: number };
+    guides?: {
+      unit?: 'pt' | 'px';
+      origin?: 'liveArea' | 'canvas';
+      vertical?: TemplateGuide[];
+      horizontal?: TemplateGuide[];
+      verticalGutters?: Array<Record<string, unknown>>;
+      horizontalGutters?: Array<Record<string, unknown>>;
+      horizontalBands?: Array<Record<string, unknown>>;
+      source?: string;
+      guideColor?: string;
+      baselineGuideColor?: string;
+      notes?: string;
+    };
+    baseline?: {
+      unit?: string;
+      increment?: number;
+      startOffset?: number;
+      alignTextToBaseline?: boolean;
+      alignImagesToBaseline?: boolean;
+    };
     layoutDensity: string;
     alignment: string;
     type: string;
@@ -37,28 +72,43 @@ export type TemplateJSON = {
     y: number;
     w: number;
     h: number;
+    frame?: {
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      unit?: 'pt' | 'px';
+      origin?: 'liveArea' | 'canvas';
+    };
     style?: string;
     crop?: 'cover' | 'contain';
     chartType?: string;
     zIndex?: number;
     required?: boolean;
+    priority?: string | number;
+    order?: number;
+    maxFillCount?: number;
+    acceptedAspectRatio?: string;
+    aspectRatioHint?: number;
+    placeholderLabel?: string;
+    placeholderColor?: string;
     textRules?: TextRules;
     contentSummary?: string;
   }>;
-  contentRequirements: {
+  contentRequirements?: {
     required: string[];
     optional: string[];
   };
-  slots: {
+  slots?: {
     textSlots?: Array<Record<string, unknown> & { id: string; role: string; required?: boolean }>;
     imageSlots?: Array<Record<string, unknown> & { id: string; role: string; required?: boolean }>;
     dataSlots?: Array<Record<string, unknown> & { id: string; role: string; required?: boolean }>;
     mappingSlots?: Array<Record<string, unknown> & { id: string; role: string; required?: boolean }>;
     captionSlots?: Array<Record<string, unknown> & { id: string; role: string; required?: boolean }>;
   };
-  styleRules: Record<string, unknown>;
-  aiGenerationRules: Record<string, unknown>;
-  layoutVariants: Array<Record<string, unknown> & { variantId: string; layoutLogic: string }>;
+  styleRules?: Record<string, unknown>;
+  aiGenerationRules?: Record<string, unknown>;
+  layoutVariants?: Array<Record<string, unknown> & { variantId: string; layoutLogic: string }>;
   layoutRules?: Record<string, unknown>;
   designSystem?: Record<string, unknown>;
   sections?: Array<Record<string, unknown>>;
@@ -109,9 +159,11 @@ export type TemplateManifest = {
 export type TextRules = {
   maxChars?: number;
   fontSize?: number;
+  lineHeight?: number;
   lineClamp?: number;
   overflow?: 'clip' | 'visible' | 'autoHeight';
   padding?: number;
+  baselineAligned?: boolean;
 };
 
 export type ContentJSON = {

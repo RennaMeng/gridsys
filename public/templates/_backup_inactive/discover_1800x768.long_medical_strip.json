@@ -1,6 +1,6 @@
 {
   "templateMeta": {
-    "templateId": "discover_long_medical_strip",
+    "templateId": "discover_1800x768.long_medical_strip",
     "templateName": "Discover Long Medical Strip",
     "pageType": "discover",
     "doubleDiamondStage": "discover",
@@ -1023,7 +1023,7 @@
   },
   "styleRules": {
     "visualDensity": "high",
-    "layoutStyle": "discover_long_medical_strip",
+    "layoutStyle": "discover_1800x768.long_medical_strip",
     "textTone": "abstract project logic, no concrete source-project nouns",
     "preserveStrongLeftHero": true
   },
@@ -1042,7 +1042,7 @@
   },
   "layoutVariants": [
     {
-      "variantId": "discover_long_medical_strip",
+      "variantId": "discover_1800x768.long_medical_strip",
       "layoutLogic": "three_column_long_strip_inspiration_research_interview_report"
     }
   ]

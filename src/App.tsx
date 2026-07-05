@@ -22,7 +22,6 @@ import {
   LayoutGrid,
   FileText,
   Workflow,
-  Zap,
   Upload,
   AlignLeft,
   AlignCenter,
@@ -37,41 +36,30 @@ import {
   HelpCircle,
   X,
   Bold,
-  Italic
+  Italic,
+  Shuffle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LayoutBlock, GridSettings } from './types';
-import { analyzeProjectContent } from './utils/analyzeProjectContent';
-import { loadAllTemplates } from './utils/loadTemplate';
-import { renderJSONToLayoutBlocks } from './utils/renderElements';
-import { ContentJSON, RenderJSON, TemplateJSON } from './utils/templateTypes';
+import { loadTemplate } from './utils/loadTemplate';
+import { TemplateGuide, TemplateJSON } from './utils/templateTypes';
 
 // Constants
-const COLUMNS = 24;
-const ROWS = 16; 
-const MARGIN = 48;
-const GUTTER = 0;
+const DEFAULT_COLUMNS = 6;
+const DEFAULT_ROWS = 6;
+const DEFAULT_MARGIN = 48;
+const DEFAULT_GUTTER = 0;
+const DEFAULT_BASELINE = 12;
+const DEFAULT_TEMPLATE_ID = 'a3_landscape_board_04';
+const A3_TEMPLATE_IDS = ['a3_landscape_board_04', 'a3_landscape_board_05'];
 
 type CanvasPresetId = 'digital-16-9' | 'strip-1800-768' | 'a3' | 'a4';
 type CanvasOrientation = 'landscape' | 'portrait';
 type LayoutMode = 'strict' | 'editorial';
 type SidebarMode = 'generate' | 'edit';
-type PageStage = 'discover' | 'define' | 'develop' | 'deliver';
 type Language = 'zh' | 'en';
 type ReferenceMode = 'template' | 'upload';
 type ImageAssetRole = 'hero_image' | 'supporting_image' | 'diagram_image' | 'data_visualization' | 'icon_image' | 'background_image' | 'portrait_image' | 'product_image' | 'reference';
-type AssetVisualType = 'portrait' | 'chart' | 'diagram' | 'product_photo' | 'field_photo' | 'screenshot';
-type AssetInformationDensity = 'high' | 'medium' | 'low';
-type AssetProfile = {
-  visualType: AssetVisualType;
-  informationDensity: AssetInformationDensity;
-  recommendedRole: Exclude<ImageAssetRole, 'reference'>;
-  subject?: string;
-  bestUse?: string;
-  confidence?: number;
-  reasoning?: string;
-  source?: 'local' | 'ai' | 'user';
-};
 type TextAssetRole = 'title' | 'subtitle' | 'body' | 'caption' | 'label';
 
 type ImageAsset = {
@@ -81,7 +69,6 @@ type ImageAsset = {
   role: ImageAssetRole;
   width?: number;
   height?: number;
-  assetProfile?: AssetProfile;
 };
 
 type TextAsset = {
@@ -91,25 +78,18 @@ type TextAsset = {
   role: TextAssetRole;
 };
 
-type LayoutPreviewState = {
-  prompt: string;
-  templateId: string;
-  referenceMode: ReferenceMode;
+type TemplateElement = NonNullable<TemplateJSON['elements']>[number];
+
+type GridSpec = {
+  columns: number;
+  rows: number;
+  margin: number;
+  gutter: number;
+  rowGap: number;
+  baseline: number;
+  guides?: NonNullable<TemplateJSON['grid']['guides']>;
 };
 
-type PreviewPlanItem = {
-  slotId: string;
-  type: LayoutBlock['type'];
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  note: string;
-  fontSize?: number;
-  lineClamp?: number;
-};
-
-const clampValue = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const TEXT_BLOCK_TYPES: LayoutBlock['type'][] = ['text', 'heading', 'title'];
 const isTextBlock = (type: LayoutBlock['type']) => TEXT_BLOCK_TYPES.includes(type);
 const createLocalId = () => Math.random().toString(36).slice(2, 10);
@@ -123,53 +103,6 @@ const IMAGE_ROLE_OPTIONS: Array<{ label: string; value: Exclude<ImageAssetRole, 
   { label: 'PERSON', value: 'portrait_image' },
   { label: 'PRODUCT', value: 'product_image' }
 ];
-const ASSET_VISUAL_TYPE_OPTIONS: Array<{ label: string; value: AssetVisualType }> = [
-  { label: 'PORTRAIT', value: 'portrait' },
-  { label: 'CHART', value: 'chart' },
-  { label: 'DIAGRAM', value: 'diagram' },
-  { label: 'PRODUCT', value: 'product_photo' },
-  { label: 'FIELD', value: 'field_photo' },
-  { label: 'SCREEN', value: 'screenshot' }
-];
-const ASSET_DENSITY_OPTIONS: Array<{ label: string; value: AssetInformationDensity }> = [
-  { label: 'HIGH', value: 'high' },
-  { label: 'MED', value: 'medium' },
-  { label: 'LOW', value: 'low' }
-];
-const VISUAL_TYPE_ROLE_MAP: Record<AssetVisualType, Exclude<ImageAssetRole, 'reference'>> = {
-  portrait: 'portrait_image',
-  chart: 'data_visualization',
-  diagram: 'diagram_image',
-  product_photo: 'product_image',
-  field_photo: 'supporting_image',
-  screenshot: 'supporting_image'
-};
-const LOCAL_ASSET_PROFILE_COPY: Record<AssetVisualType, { subject: string; bestUse: string }> = {
-  portrait: {
-    subject: 'Possible person or user-context image.',
-    bestUse: 'Interview, participant, user story, or case slot.'
-  },
-  chart: {
-    subject: 'Possible data visualization or chart.',
-    bestUse: 'Research evidence, statistic, or data slot.'
-  },
-  diagram: {
-    subject: 'Possible diagram, map, or process visual.',
-    bestUse: 'System, process, method, or mapping slot.'
-  },
-  product_photo: {
-    subject: 'Possible product, prototype, model, or material detail.',
-    bestUse: 'Prototype, component, outcome, or detail slot.'
-  },
-  field_photo: {
-    subject: 'Possible field, context, or supporting photo.',
-    bestUse: 'Hero, context, evidence, or supporting visual slot.'
-  },
-  screenshot: {
-    subject: 'Possible interface screenshot or dense screen capture.',
-    bestUse: 'UI evidence, process, testing, or medium supporting slot.'
-  }
-};
 const isInteractiveTarget = (target: EventTarget | null) => (
   target instanceof HTMLInputElement ||
   target instanceof HTMLTextAreaElement ||
@@ -179,61 +112,14 @@ const isInteractiveTarget = (target: EventTarget | null) => (
   (target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, button, a, [contenteditable="true"]')))
 );
 
-const inferLocalAssetProfile = (
-  fileName: string,
-  width?: number,
-  height?: number,
-  fallbackRole: Exclude<ImageAssetRole, 'reference'> = 'supporting_image'
-): AssetProfile => {
-  const name = fileName.toLowerCase();
-  const aspectRatio = width && height ? width / height : 1;
-  const visualType: AssetVisualType = /chart|graph|data|stat|plot|table|数据|图表/.test(name)
-    ? 'chart'
-    : /diagram|map|flow|wireframe|schema|mapping|地图|流程|结构/.test(name)
-      ? 'diagram'
-      : /portrait|person|user|interview|avatar|人物|访谈|用户/.test(name)
-        ? 'portrait'
-        : /product|prototype|model|mockup|产品|原型|模型/.test(name)
-          ? 'product_photo'
-          : /screen|screenshot|ui|界面|截图/.test(name)
-            ? 'screenshot'
-            : 'field_photo';
-  const informationDensity: AssetInformationDensity = visualType === 'chart' || visualType === 'diagram' || visualType === 'screenshot'
-    ? 'high'
-    : aspectRatio > 1.8 || aspectRatio < 0.65
-      ? 'medium'
-      : 'low';
-
-  return {
-    visualType,
-    informationDensity,
-    recommendedRole: VISUAL_TYPE_ROLE_MAP[visualType] || fallbackRole,
-    subject: LOCAL_ASSET_PROFILE_COPY[visualType].subject,
-    bestUse: LOCAL_ASSET_PROFILE_COPY[visualType].bestUse,
-    confidence: 0.45,
-    reasoning: 'Local filename and aspect-ratio estimate before AI analysis.',
-    source: 'local'
-  };
+const shuffled = <T,>(items: T[]) => {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
 };
-
-const createImagePreviewDataUrl = (dataUrl: string, maxSide = 512): Promise<string> => new Promise((resolve) => {
-  const image = new Image();
-  image.onload = () => {
-    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const context = canvas.getContext('2d');
-    if (!context) {
-      resolve(dataUrl);
-      return;
-    }
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    resolve(canvas.toDataURL('image/jpeg', 0.72));
-  };
-  image.onerror = () => resolve(dataUrl);
-  image.src = dataUrl;
-});
 
 const CANVAS_PRESETS: Array<{
   id: CanvasPresetId;
@@ -245,22 +131,9 @@ const CANVAS_PRESETS: Array<{
 }> = [
   { id: 'digital-16-9', label: '16:9', viewportLabel: '16:9_DIGITAL', width: 960, height: 540, defaultOrientation: 'landscape' },
   { id: 'strip-1800-768', label: 'STRIP', viewportLabel: 'STRIP_1800x768', width: 1800, height: 768, defaultOrientation: 'landscape' },
-  { id: 'a3', label: 'A3', viewportLabel: 'A3_PRINT', width: 1123, height: 1587, defaultOrientation: 'portrait' },
+  { id: 'a3', label: 'A3', viewportLabel: 'A3_PRINT', width: 1190.55, height: 841.89, defaultOrientation: 'landscape' },
   { id: 'a4', label: 'A4', viewportLabel: 'A4_PRINT', width: 794, height: 1123, defaultOrientation: 'portrait' },
 ];
-
-const STAGE_TEMPLATE_MAP: Record<PageStage, string> = {
-  discover: 'discover_context_mapping_16x9',
-  define: 'define_concept_sketch_long_16x9',
-  develop: 'develop_prototype_demo_16x9',
-  deliver: 'deliver_final_outcome_16x9'
-};
-
-const getDefaultTemplateForStage = (stage: PageStage, presetId: CanvasPresetId) => (
-  stage === 'discover' && presetId === 'strip-1800-768'
-    ? 'discover_long_medical_strip'
-    : STAGE_TEMPLATE_MAP[stage]
-);
 
 const UI_TEXT = {
   zh: {
@@ -273,13 +146,13 @@ const UI_TEXT = {
     visibility: '网格',
     guide: '指南',
     workflow: '工作流',
-    aiGenerate: 'AI 生成',
+    aiGenerate: '模板 / 素材',
     freeEdit: '自由编辑',
     reference: '1. 参考',
     template: '模板',
     ownReference: '上传参考',
-    templateHelp: '选择 4 个阶段匹配的模板。',
-    ownReferenceHelp: '上传自己的排版参考，AI 会先理解参考图并直接生成 JSON。',
+    templateHelp: '加载当前 A3 模板并读取网格/基线。',
+    ownReferenceHelp: '上传自己的排版参考图，作为视觉参照保存。',
     selectTemplate: '选择模板',
     uploadReference: '上传参考图',
     assets: '2. 素材',
@@ -287,12 +160,12 @@ const UI_TEXT = {
     useTextAssets: '使用文字素材',
     useTextAssetsHelp: '开启后可以上传标题、正文和说明文字。',
     addText: '添加文字',
-    generate: '生成排版',
-    updateWithAI: 'AI 生成',
-    aiEdit: '3. AI 修改',
-    aiEditIntro: '你可以在这里和AI共同修改当前的模版',
-    generateInfo: '第一次生成不需要输入提示词。选择参考方式并上传素材后，点击左下方生成排版。',
-    aiPlaceholder: '描述希望 AI 修改的方向，例如：让图片更密集、减少文字、突出右侧主视觉...',
+    generate: '随机分配素材',
+    updateWithAI: '重新随机分配',
+    aiEdit: '3. 本地分配',
+    aiEditIntro: '上传素材后，将文字和图片随机填入当前区块。',
+    generateInfo: '图片和文字会在本地随机填入，也可以拖拽或手动调整。',
+    aiPlaceholder: '本地分配模式不需要提示词。',
     inspector: '参数调整',
     selectElement: '选择元素',
     selectedBlocks: '已选择区块',
@@ -337,13 +210,13 @@ const UI_TEXT = {
     visibility: 'Grid',
     guide: 'Guide',
     workflow: 'Workflow',
-    aiGenerate: 'AI Generate',
+    aiGenerate: 'Template Assets',
     freeEdit: 'Free Edit',
     reference: '1. Reference',
     template: 'Template',
     ownReference: 'Upload Reference',
-    templateHelp: 'Choose a template matched to the four stages.',
-    ownReferenceHelp: 'Upload your own layout reference. AI reads it first and generates JSON directly.',
+    templateHelp: 'Load the current A3 template and read its grid/baseline.',
+    ownReferenceHelp: 'Upload your own layout reference as a visual guide.',
     selectTemplate: 'Select Template',
     uploadReference: 'Upload Reference Images',
     assets: '2. Assets',
@@ -351,12 +224,12 @@ const UI_TEXT = {
     useTextAssets: 'Use Text Assets',
     useTextAssetsHelp: 'Enable this to upload titles, body copy, and captions.',
     addText: 'Add Text',
-    generate: 'Generate Layout',
-    updateWithAI: 'AI Generate',
-    aiEdit: '3. AI Edit',
-    aiEditIntro: 'You can revise the current template together with AI here.',
-    generateInfo: 'No prompt is needed for the first generation. Choose a reference mode, upload assets, then use the bottom generate button.',
-    aiPlaceholder: 'Describe how AI should revise the layout, e.g. make images denser, reduce text, emphasize the right hero image...',
+    generate: 'Random Assign Assets',
+    updateWithAI: 'Random Assign Again',
+    aiEdit: '3. Local Assignment',
+    aiEditIntro: 'Upload assets, then fill current blocks locally at random.',
+    generateInfo: 'Images and text are filled locally at random and remain manually editable.',
+    aiPlaceholder: 'Local assignment does not need a prompt.',
     inspector: 'Parametric Inspector',
     selectElement: 'Select Element',
     selectedBlocks: 'Blocks Selected',
@@ -405,15 +278,34 @@ const resolveCanvasSize = (
     : { width: shortSide, height: longSide };
 };
 
-const getGridMetrics = (preset: { width: number; height: number }) => {
-  const safeAreaWidth = preset.width - (MARGIN * 2);
-  const safeAreaHeight = preset.height - (MARGIN * 2);
-  const colWidth = (safeAreaWidth - (COLUMNS - 1) * GUTTER) / COLUMNS;
-  const rowHeight = (safeAreaHeight - (ROWS - 1) * GUTTER) / ROWS;
-  const colUnit = colWidth + GUTTER;
-  const rowUnit = rowHeight + GUTTER;
+const getTemplateGridSpec = (template: TemplateJSON | null, presetId: CanvasPresetId): GridSpec => {
+  const templateGrid = template?.grid;
+  const columnGap = templateGrid?.columnGap ?? DEFAULT_GUTTER;
+  const rowGap = templateGrid?.rowGap ?? columnGap;
+  const fallbackColumns = presetId === 'a3' ? DEFAULT_COLUMNS : 24;
+  const fallbackRows = presetId === 'a3' ? DEFAULT_ROWS : 16;
 
   return {
+    columns: templateGrid?.columns ?? fallbackColumns,
+    rows: templateGrid?.rows ?? fallbackRows,
+    margin: templateGrid?.margin ?? DEFAULT_MARGIN,
+    gutter: columnGap,
+    rowGap,
+    baseline: templateGrid?.baseline?.increment ?? DEFAULT_BASELINE,
+    guides: templateGrid?.guides
+  };
+};
+
+const getGridMetrics = (preset: { width: number; height: number }, gridSpec: GridSpec) => {
+  const safeAreaWidth = preset.width - (gridSpec.margin * 2);
+  const safeAreaHeight = preset.height - (gridSpec.margin * 2);
+  const colWidth = (safeAreaWidth - (gridSpec.columns - 1) * gridSpec.gutter) / gridSpec.columns;
+  const rowHeight = (safeAreaHeight - (gridSpec.rows - 1) * gridSpec.rowGap) / gridSpec.rows;
+  const colUnit = colWidth + gridSpec.gutter;
+  const rowUnit = rowHeight + gridSpec.rowGap;
+
+  return {
+    ...gridSpec,
     safeAreaWidth,
     safeAreaHeight,
     colWidth,
@@ -422,6 +314,26 @@ const getGridMetrics = (preset: { width: number; height: number }) => {
     rowUnit,
   };
 };
+
+const buildModuleGuides = (count: number, moduleSize: number, gap: number) => {
+  const positions = new Set<number>([0]);
+  let cursor = 0;
+  for (let i = 0; i < count; i += 1) {
+    cursor += moduleSize;
+    positions.add(Number(cursor.toFixed(3)));
+    if (i < count - 1) {
+      cursor += gap;
+      positions.add(Number(cursor.toFixed(3)));
+    }
+  }
+  return [...positions].sort((a, b) => a - b);
+};
+
+const normalizeGuides = (guides: TemplateGuide[] | undefined, fallback: number[]): Array<Exclude<TemplateGuide, number>> => (
+  guides?.length
+    ? guides.map(guide => typeof guide === 'number' ? { position: guide } : guide)
+    : fallback.map(position => ({ position }))
+);
 
 const getPixelRect = (
   x: number,
@@ -432,9 +344,84 @@ const getPixelRect = (
 ) => ({
   left: x * metrics.colUnit,
   top: y * metrics.rowUnit,
-  width: w * metrics.colWidth + (w - 1) * GUTTER,
-  height: h * metrics.rowHeight + (h - 1) * GUTTER
+  width: w * metrics.colWidth + Math.max(0, w - 1) * metrics.gutter,
+  height: h * metrics.rowHeight + Math.max(0, h - 1) * metrics.rowGap
 });
+
+const getBlockRect = (block: LayoutBlock, metrics: ReturnType<typeof getGridMetrics>) => {
+  if (block.frame) {
+    const frameLeft = block.frame.origin === 'canvas'
+      ? block.frame.x - metrics.margin
+      : block.frame.x;
+    const frameTop = block.frame.origin === 'canvas'
+      ? block.frame.y - metrics.margin
+      : block.frame.y;
+    return {
+      left: frameLeft,
+      top: frameTop,
+      width: block.frame.w,
+      height: block.frame.h
+    };
+  }
+  return getPixelRect(block.x, block.y, block.w, block.h, metrics);
+};
+
+const templateElementToBlockType = (element: TemplateElement): LayoutBlock['type'] => {
+  if (element.type === 'image') return 'image';
+  if (element.role?.includes('title') || ['h1', 'h2', 'h3', 'h4', 'h5'].includes(String(element.style))) return 'title';
+  if (element.type === 'text' || element.type === 'caption' || element.type === 'annotation') return 'text';
+  return 'container';
+};
+
+const getTemplateElementKind = (element: TemplateElement) => {
+  if (element.type === 'image') return 'image';
+  const role = element.role || '';
+  const style = String(element.style || '');
+  if (role.includes('title') || style.startsWith('h')) return 'title';
+  if (role.includes('caption') || element.type === 'caption' || element.type === 'annotation') return 'caption';
+  if (role.includes('body') || role.includes('text')) return 'body';
+  return 'text';
+};
+
+const templateElementToLayoutBlock = (element: TemplateElement, index: number, overrides: Partial<LayoutBlock> = {}): LayoutBlock => {
+  const type = templateElementToBlockType(element);
+  const isText = isTextBlock(type);
+  const backgroundColor = element.type === 'image'
+    ? '#E9E9E9'
+    : isText
+      ? 'transparent'
+      : (element.placeholderColor || '#FFFFFF');
+
+  return {
+    id: `${element.slotId}-${index}-${createLocalId()}`,
+    type,
+    label: element.placeholderLabel || element.contentSummary || element.role || element.slotId,
+    x: element.x,
+    y: element.y,
+    w: element.w,
+    h: element.h,
+    frame: element.frame,
+    category: 'Generic',
+    imageFit: element.crop || 'cover',
+    imageZoom: 1,
+    imagePanX: 0,
+    imagePanY: 0,
+    fontSize: element.textRules?.fontSize || (element.style === 'h5' ? 20 : 8),
+    fontFamily: 'Inter, sans-serif',
+    fontWeight: element.role?.includes('title') ? 'bold' : 'normal',
+    fontStyle: element.role?.includes('caption') ? 'italic' : 'normal',
+    textColor: '#111111',
+    backgroundColor,
+    overflowMode: isText ? (element.textRules?.overflow || 'clip') : 'clip',
+    padding: isText ? (element.textRules?.padding ?? 0) : undefined,
+    lineClamp: isText ? element.textRules?.lineClamp : undefined,
+    zIndex: element.zIndex || index + 1,
+    generatedByAI: false,
+    sourceSlotId: element.slotId,
+    previewSlotKind: element.type === 'image' ? 'image' : isText ? 'text' : undefined,
+    ...overrides
+  };
+};
 
 const INITIAL_BLOCKS: LayoutBlock[] = [
   { 
@@ -472,21 +459,24 @@ const INITIAL_BLOCKS: LayoutBlock[] = [
 ];
 
 export default function App() {
-  const [blocks, setBlocks] = useState<LayoutBlock[]>(INITIAL_BLOCKS);
+  const [blocks, setBlocks] = useState<LayoutBlock[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [history, setHistory] = useState<LayoutBlock[][]>([]);
   const [future, setFuture] = useState<LayoutBlock[][]>([]);
-  const blocksRef = useRef<LayoutBlock[]>(INITIAL_BLOCKS);
+  const blocksRef = useRef<LayoutBlock[]>([]);
   const [showGrid, setShowGrid] = useState(true);
+  const [showBaseline, setShowBaseline] = useState(true);
   const [zoom, setZoom] = useState(0.85);
   const [isLocked, setIsLocked] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('editorial');
   const [language, setLanguage] = useState<Language>('zh');
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem('gridSysGuideSeen') !== '1');
-  const [canvasPresetId, setCanvasPresetId] = useState<CanvasPresetId>('digital-16-9');
+  const [canvasPresetId, setCanvasPresetId] = useState<CanvasPresetId>('a3');
   const [canvasOrientation, setCanvasOrientation] = useState<CanvasOrientation>('landscape');
+  const [activeTemplate, setActiveTemplate] = useState<TemplateJSON | null>(null);
+  const [activeTemplateId, setActiveTemplateId] = useState(DEFAULT_TEMPLATE_ID);
+  const [availableTemplates, setAvailableTemplates] = useState<TemplateJSON[]>([]);
   const canvasPreset = useMemo(
     () => CANVAS_PRESETS.find(preset => preset.id === canvasPresetId) || CANVAS_PRESETS[0],
     [canvasPresetId]
@@ -496,29 +486,20 @@ export default function App() {
     [canvasPreset, canvasOrientation]
   );
   const canvasViewportLabel = `${canvasPreset.viewportLabel}_${canvasOrientation.toUpperCase()}`;
-  const gridMetrics = useMemo(() => getGridMetrics(canvasSize), [canvasSize]);
+  const activeGridSpec = useMemo(
+    () => getTemplateGridSpec(activeTemplate, canvasPresetId),
+    [activeTemplate, canvasPresetId]
+  );
+  const gridMetrics = useMemo(() => getGridMetrics(canvasSize, activeGridSpec), [activeGridSpec, canvasSize]);
   const workspaceRef = useRef<HTMLElement>(null);
   
-  // 素材池与 AI 生成状态
+  // 素材池与本地分配状态
   const [imageAssets, setImageAssets] = useState<ImageAsset[]>([]);
   const [textAssets, setTextAssets] = useState<TextAsset[]>([]);
   const [newTextAsset, setNewTextAsset] = useState('');
   const [newTextRole, setNewTextRole] = useState<TextAssetRole>('body');
-  const [chatMessages, setChatMessages] = useState<{role:'user'|'ai', text:string}[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [availableTemplates, setAvailableTemplates] = useState<TemplateJSON[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<'auto' | string>(getDefaultTemplateForStage('discover', 'digital-16-9'));
-  const [uploadedReferenceTemplate, setUploadedReferenceTemplate] = useState<TemplateJSON | null>(null);
-  const [lastRenderJSON, setLastRenderJSON] = useState<RenderJSON | null>(null);
-  const [pendingLayoutPreview, setPendingLayoutPreview] = useState<LayoutPreviewState | null>(null);
-  const [lastLayoutPrompt, setLastLayoutPrompt] = useState('');
-  const [assetAnalysisPendingIds, setAssetAnalysisPendingIds] = useState<string[]>([]);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('generate');
-  const [pageStage, setPageStage] = useState<PageStage>('discover');
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>('template');
-  const [textAssetsEnabled, setTextAssetsEnabled] = useState(false);
-  const [referenceTemplateLoading, setReferenceTemplateLoading] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     pageType: false,
     assets: false,
@@ -531,6 +512,10 @@ export default function App() {
   // Drag State
   const [dragPreview, setDragPreview] = useState<{ id: string, x: number, y: number } | null>(null);
   const [selectionBox, setSelectionBox] = useState<{ left: number, top: number, width: number, height: number } | null>(null);
+  const [aiConfirmOpen, setAiConfirmOpen] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPreviewImage, setAiPreviewImage] = useState<string | null>(null);
+  const [aiGenerationError, setAiGenerationError] = useState<string | null>(null);
   const safeAreaRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<{ startX: number, startY: number } | null>(null);
   const dragRef = useRef<{
@@ -538,14 +523,15 @@ export default function App() {
     startMouseX: number
     startMouseY: number
     startPositions: Record<string, { x: number, y: number }>
+    startFrames: Record<string, NonNullable<LayoutBlock['frame']>>
   } | null>(null);
-  const textDragTimerRef = useRef<number | null>(null);
   const resizeRef = useRef<{
     id: string
     startMouseX: number
     startMouseY: number
     startW: number
     startH: number
+    startFrame?: NonNullable<LayoutBlock['frame']>
   } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
 
@@ -579,6 +565,25 @@ export default function App() {
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
+
+  useEffect(() => {
+    Promise.all(A3_TEMPLATE_IDS.map(templateId => loadTemplate(templateId)))
+      .then(templates => {
+        setAvailableTemplates(templates);
+        const defaultTemplate = templates.find(template => template.templateMeta.templateId === DEFAULT_TEMPLATE_ID) || templates[0];
+        setActiveTemplate(defaultTemplate);
+        setActiveTemplateId(defaultTemplate.templateMeta.templateId);
+        setCanvasPresetId('a3');
+        setCanvasOrientation('landscape');
+        setBlocks([]);
+        blocksRef.current = [];
+        setSelectedId(null);
+        setSelectedIds([]);
+      })
+      .catch(error => {
+        console.warn('Failed to load A3 templates', error);
+      });
+  }, []);
 
   const rememberBlocks = () => {
     const snapshot = blocksRef.current.map(block => ({ ...block }));
@@ -617,20 +622,13 @@ export default function App() {
     blocksRef.current = [];
     setSelectedId(null);
     setSelectedIds([]);
-    setEditingTextId(null);
     setHistory([]);
     setFuture([]);
-    setLastRenderJSON(null);
-    setPendingLayoutPreview(null);
-    setLastLayoutPrompt('');
-    setChatMessages([]);
-    setChatInput('');
   };
 
   const selectOnly = (id: string | null) => {
     setSelectedId(id);
     setSelectedIds(id ? [id] : []);
-    setEditingTextId(prev => (prev && prev !== id ? null : prev));
   };
 
   const updateBlock = (id: string, updates: Partial<LayoutBlock>, remember = false) => {
@@ -641,14 +639,6 @@ export default function App() {
   const selectCanvasPreset = (preset: typeof CANVAS_PRESETS[number]) => {
     setCanvasPresetId(preset.id);
     setCanvasOrientation(preset.defaultOrientation);
-    if (referenceMode === 'template' && pageStage === 'discover') {
-      setSelectedTemplateId(getDefaultTemplateForStage('discover', preset.id));
-    }
-  };
-
-  const selectPageStage = (stage: PageStage) => {
-    setPageStage(stage);
-    setSelectedTemplateId(getDefaultTemplateForStage(stage, canvasPresetId));
   };
 
   const toggleSection = (section: string) => {
@@ -663,14 +653,6 @@ export default function App() {
     window.addEventListener('resize', fitCanvasToViewport);
     return () => window.removeEventListener('resize', fitCanvasToViewport);
   }, [fitCanvasToViewport]);
-
-  useEffect(() => {
-    loadAllTemplates()
-      .then(setAvailableTemplates)
-      .catch(error => {
-        setChatMessages(prev => [...prev, { role: 'ai', text: `模板加载失败: ${error.message}` }]);
-      });
-  }, []);
 
   const addBlock = (name: string, category: LayoutBlock['category'], type: LayoutBlock['type'] = 'container') => {
     rememberBlocks();
@@ -702,6 +684,22 @@ export default function App() {
     selectOnly(newBlock.id);
   };
 
+  const loadTemplateBlocks = (template = activeTemplate) => {
+    if (!template) return;
+    rememberBlocks();
+    setActiveTemplate(template);
+    setActiveTemplateId(template.templateMeta.templateId);
+    setCanvasPresetId('a3');
+    setCanvasOrientation('landscape');
+    const templateBlocks = (template.elements || [])
+      .slice()
+      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .map((element, index) => templateElementToLayoutBlock(element, index));
+    setBlocks(templateBlocks);
+    blocksRef.current = templateBlocks;
+    selectOnly(null);
+  };
+
   const applyCompact = (currentBlocks: LayoutBlock[], activeId?: string) => {
     const sorted = [...currentBlocks].sort((a, b) => a.y - b.y || a.x - b.x);
     const placed: LayoutBlock[] = [];
@@ -717,7 +715,7 @@ export default function App() {
       if (block.id === activeId) continue;
       
       let newY = 0;
-      while (newY + block.h <= ROWS) {
+      while (newY + block.h <= gridMetrics.rows) {
         const collision = placed.some(p => 
           p.x < block.x + block.w &&
           p.x + p.w > block.x &&
@@ -791,6 +789,11 @@ export default function App() {
         blocksRef.current
           .filter(b => activeIds.includes(b.id))
           .map(b => [b.id, { x: b.x, y: b.y }])
+      ),
+      startFrames: Object.fromEntries(
+        blocksRef.current
+          .filter(b => activeIds.includes(b.id) && b.frame)
+          .map(b => [b.id, b.frame!])
       )
     };
 
@@ -798,32 +801,9 @@ export default function App() {
     window.addEventListener('mouseup', handleDragEnd);
   };
 
-  const clearTextDragTimer = () => {
-    if (textDragTimerRef.current) {
-      window.clearTimeout(textDragTimerRef.current);
-      textDragTimerRef.current = null;
-    }
-  };
-
-  const handleTextBlockMouseDown = (e: React.MouseEvent, block: LayoutBlock) => {
-    e.stopPropagation();
-    if (isLocked || isInteractiveTarget(e.target)) return;
-    selectOnly(block.id);
-    if (editingTextId === block.id) return;
-
-    const event = e;
-    clearTextDragTimer();
-    textDragTimerRef.current = window.setTimeout(() => {
-      textDragTimerRef.current = null;
-      setEditingTextId(null);
-      handleDragStart(event, block.id);
-    }, 260);
-    window.addEventListener('mouseup', clearTextDragTimer, { once: true });
-  };
-
   const handleDragMove = (e: MouseEvent) => {
     if (!dragRef.current) return;
-    const { ids, startMouseX, startMouseY, startPositions } = dragRef.current;
+    const { ids, startMouseX, startMouseY, startPositions, startFrames } = dragRef.current;
     const currentBlocks = blocksRef.current;
     const leadId = ids[0];
     const block = currentBlocks.find(b => b.id === leadId);
@@ -832,10 +812,28 @@ export default function App() {
     const dx = Math.round((e.clientX - startMouseX) / zoom / gridMetrics.colUnit);
     const dy = Math.round((e.clientY - startMouseY) / zoom / gridMetrics.rowUnit);
     const selectedBlocks = currentBlocks.filter(b => ids.includes(b.id));
+    const hasFrameBlocks = selectedBlocks.some(b => b.frame);
+    if (hasFrameBlocks) {
+      const dxPt = (e.clientX - startMouseX) / zoom;
+      const dyPt = (e.clientY - startMouseY) / zoom;
+      setBlocks(currentBlocks.map(b => {
+        const startFrame = startFrames[b.id];
+        if (!ids.includes(b.id) || !startFrame) return b;
+        return {
+          ...b,
+          frame: {
+            ...startFrame,
+            x: Math.max(0, Math.min(gridMetrics.safeAreaWidth - startFrame.w, startFrame.x + dxPt)),
+            y: Math.max(0, Math.min(gridMetrics.safeAreaHeight - startFrame.h, startFrame.y + dyPt))
+          }
+        };
+      }));
+      return;
+    }
     const minDx = Math.max(...selectedBlocks.map(b => -startPositions[b.id].x));
-    const maxDx = Math.min(...selectedBlocks.map(b => COLUMNS - b.w - startPositions[b.id].x));
+    const maxDx = Math.min(...selectedBlocks.map(b => gridMetrics.columns - b.w - startPositions[b.id].x));
     const minDy = Math.max(...selectedBlocks.map(b => -startPositions[b.id].y));
-    const maxDy = Math.min(...selectedBlocks.map(b => ROWS - b.h - startPositions[b.id].y));
+    const maxDy = Math.min(...selectedBlocks.map(b => gridMetrics.rows - b.h - startPositions[b.id].y));
     const clampedDx = Math.max(minDx, Math.min(maxDx, dx));
     const clampedDy = Math.max(minDy, Math.min(maxDy, dy));
 
@@ -886,7 +884,7 @@ export default function App() {
       setSelectionBox(box);
       const selected = blocksRef.current
         .filter(block => {
-          const blockRect = getPixelRect(block.x, block.y, block.w, block.h, gridMetrics);
+          const blockRect = getBlockRect(block, gridMetrics);
           return box.left < blockRect.left + blockRect.width &&
             box.left + box.width > blockRect.left &&
             box.top < blockRect.top + blockRect.height &&
@@ -922,6 +920,7 @@ export default function App() {
       startMouseY: e.clientY,
       startW: block.w,
       startH: block.h,
+      startFrame: block.frame,
     };
     setIsResizing(true);
 
@@ -935,11 +934,23 @@ export default function App() {
     const block = blocks.find(b => b.id === id);
     if (!block) return;
 
+    if (resizeRef.current.startFrame) {
+      const startFrame = resizeRef.current.startFrame;
+      const dwPt = (e.clientX - startMouseX) / zoom;
+      const dhPt = (e.clientY - startMouseY) / zoom;
+      const nextW = Math.max(12, Math.min(gridMetrics.safeAreaWidth - startFrame.x, startFrame.w + dwPt));
+      const nextH = Math.max(12, Math.min(gridMetrics.safeAreaHeight - startFrame.y, startFrame.h + dhPt));
+      setBlocks(prev => prev.map(b => (
+        b.id === id ? { ...b, frame: { ...startFrame, w: nextW, h: nextH } } : b
+      )));
+      return;
+    }
+
     const dw = Math.round((e.clientX - startMouseX) / zoom / gridMetrics.colUnit);
     const dh = Math.round((e.clientY - startMouseY) / zoom / gridMetrics.rowUnit);
 
-    const newW = Math.max(1, Math.min(COLUMNS - block.x, startW + dw));
-    const newH = Math.max(1, Math.min(ROWS - block.y, startH + dh));
+    const newW = Math.max(1, Math.min(gridMetrics.columns - block.x, startW + dw));
+    const newH = Math.max(1, Math.min(gridMetrics.rows - block.y, startH + dh));
 
     // 实时更新，不触发 compact
     setBlocks(prev => prev.map(b =>
@@ -963,6 +974,195 @@ export default function App() {
       updateBlock(blockId, { imageUrl: e.target?.result as string });
     };
     reader.readAsDataURL(file);
+  };
+
+  const getTemplateImageSlots = () => (
+    (activeTemplate?.elements || [])
+      .filter(element => element.type === 'image')
+      .sort((a, b) => (a.order || 999) - (b.order || 999))
+  );
+
+  const getTemplateTextSlots = (role: TextAssetRole) => {
+    const elements = (activeTemplate?.elements || []).filter(element => element.type !== 'image');
+    const isTitle = (element: TemplateElement) => element.role?.includes('title') || String(element.style).startsWith('h');
+    const isCaption = (element: TemplateElement) => element.role?.includes('caption') || element.type === 'caption' || element.type === 'annotation';
+    const isBody = (element: TemplateElement) => element.role?.includes('body') || element.role?.includes('text');
+
+    return elements
+      .filter(element => {
+        if (role === 'title' || role === 'subtitle') return isTitle(element);
+        if (role === 'caption' || role === 'label') return isCaption(element);
+        return isBody(element) && !isTitle(element) && !isCaption(element);
+      })
+      .sort((a, b) => (a.order || 999) - (b.order || 999));
+  };
+
+  const upsertAssignedBlocks = (prev: LayoutBlock[], assigned: LayoutBlock[]) => {
+    const bySlot = new Map(assigned.map(block => [block.sourceSlotId, block]));
+    const updated = prev.map(block => (
+      block.sourceSlotId && bySlot.has(block.sourceSlotId)
+        ? { ...block, ...bySlot.get(block.sourceSlotId)! }
+        : block
+    ));
+    const existingSlots = new Set(updated.map(block => block.sourceSlotId).filter(Boolean));
+    return [
+      ...updated,
+      ...assigned.filter(block => !existingSlots.has(block.sourceSlotId))
+    ];
+  };
+
+  const buildRandomImageAssignments = () => {
+    const usableImages = imageAssets.filter(asset => asset.role !== 'reference');
+    const imageSlots = getTemplateImageSlots();
+    if (!usableImages.length || !imageSlots.length) return [];
+
+    const remainingSlots = [...imageSlots];
+    return usableImages.map((asset, assetIndex) => {
+      const assetAspect = asset.width && asset.height ? asset.width / asset.height : 1;
+      let bestIndex = 0;
+      let bestScore = Number.POSITIVE_INFINITY;
+      remainingSlots.forEach((slot, index) => {
+        const slotRect = getBlockRect(templateElementToLayoutBlock(slot, index), gridMetrics);
+        const slotAspect = slotRect.width / Math.max(1, slotRect.height);
+        const score = Math.abs(Math.log(assetAspect / slotAspect));
+        if (score < bestScore) {
+          bestScore = score;
+          bestIndex = index;
+        }
+      });
+      const slot = remainingSlots.splice(bestIndex, 1)[0];
+      if (!slot) return null;
+      return templateElementToLayoutBlock(slot, assetIndex, {
+        label: asset.name,
+        assetId: asset.id,
+        imageUrl: asset.dataUrl,
+        imageFit: 'cover',
+        backgroundColor: '#E9E9E9'
+      });
+    }).filter(Boolean) as LayoutBlock[];
+  };
+
+  const randomAssignImagesToBlocks = () => {
+    const assigned = buildRandomImageAssignments();
+    if (!assigned.length) return;
+
+    rememberBlocks();
+    setBlocks(prev => upsertAssignedBlocks(prev, assigned));
+  };
+
+  const buildRandomTextAssignments = () => {
+    const usableText = textAssets.filter(asset => asset.content.trim());
+    if (!usableText.length) return [];
+
+    const usedSlots = new Set<string>();
+    const assigned: LayoutBlock[] = [];
+    usableText.forEach((asset, assetIndex) => {
+      const slot = getTemplateTextSlots(asset.role).find(candidate => !usedSlots.has(candidate.slotId));
+      if (!slot) return;
+      usedSlots.add(slot.slotId);
+      assigned.push(templateElementToLayoutBlock(slot, assetIndex, {
+        label: asset.content,
+        fontSize: slot.textRules?.fontSize || (asset.role === 'title' ? 20 : 8),
+        fontWeight: asset.role === 'title' || asset.role === 'subtitle' ? 'bold' : 'normal'
+      }));
+    });
+
+    return assigned;
+  };
+
+  const randomAssignTextToBlocks = () => {
+    const assigned = buildRandomTextAssignments();
+    if (!assigned.length) return;
+
+    rememberBlocks();
+    setBlocks(prev => upsertAssignedBlocks(prev, assigned));
+  };
+
+  const getBlockTemplateKind = (block: LayoutBlock) => {
+    const sourceElement = activeTemplate?.elements?.find(element => element.slotId === block.sourceSlotId);
+    if (sourceElement) return getTemplateElementKind(sourceElement);
+    if (block.type === 'image') return 'image';
+    if (block.type === 'title' || block.type === 'heading') return 'title';
+    if (isTextBlock(block.type)) return 'body';
+    return 'text';
+  };
+
+  const moveBlockToTemplateElement = (block: LayoutBlock, element: TemplateElement, index: number): LayoutBlock => {
+    const slotBlock = templateElementToLayoutBlock(element, index);
+    const slotIsText = isTextBlock(slotBlock.type);
+
+    return {
+      ...block,
+      x: slotBlock.x,
+      y: slotBlock.y,
+      w: slotBlock.w,
+      h: slotBlock.h,
+      frame: slotBlock.frame,
+      sourceSlotId: element.slotId,
+      previewSlotKind: slotBlock.previewSlotKind,
+      backgroundColor: slotBlock.backgroundColor,
+      imageFit: block.type === 'image' ? (block.imageFit || slotBlock.imageFit) : block.imageFit,
+      overflowMode: isTextBlock(block.type) ? slotBlock.overflowMode : block.overflowMode,
+      padding: isTextBlock(block.type) ? slotBlock.padding : block.padding,
+      lineClamp: isTextBlock(block.type) ? slotBlock.lineClamp : block.lineClamp,
+      fontSize: slotIsText ? (slotBlock.fontSize || block.fontSize) : block.fontSize,
+      fontWeight: slotIsText ? (slotBlock.fontWeight || block.fontWeight) : block.fontWeight
+    };
+  };
+
+  const randomizeCanvasSections = (currentBlocks: LayoutBlock[]) => {
+    if (!activeTemplate) return currentBlocks;
+    const templateSlots = (activeTemplate.elements || [])
+      .slice()
+      .sort((a, b) => (a.order || 999) - (b.order || 999));
+    if (!templateSlots.length || !currentBlocks.length) return currentBlocks;
+
+    const slotsByKind = templateSlots.reduce<Record<string, TemplateElement[]>>((groups, element) => {
+      const kind = getTemplateElementKind(element);
+      return {
+        ...groups,
+        [kind]: [...(groups[kind] || []), element]
+      };
+    }, {});
+
+    const blocksByKind = currentBlocks.reduce<Record<string, LayoutBlock[]>>((groups, block) => {
+      const kind = getBlockTemplateKind(block);
+      return {
+        ...groups,
+        [kind]: [...(groups[kind] || []), block]
+      };
+    }, {});
+
+    const movedBlocks = new Map<string, LayoutBlock>();
+    Object.entries(blocksByKind).forEach(([kind, sameKindBlocks]) => {
+      const slotPool = shuffled(slotsByKind[kind] || []);
+      sameKindBlocks.forEach((block, index) => {
+        const targetSlot = slotPool[index];
+        if (targetSlot) {
+          movedBlocks.set(block.id, moveBlockToTemplateElement(block, targetSlot, index));
+        }
+      });
+    });
+
+    return currentBlocks.map(block => movedBlocks.get(block.id) || block);
+  };
+
+  const randomizeCurrentLayout = () => {
+    if (!activeTemplate || !blocks.length) return;
+    rememberBlocks();
+    setBlocks(prev => randomizeCanvasSections(prev));
+  };
+
+  const randomAssignAllAssets = () => {
+    if (!activeTemplate) return;
+    rememberBlocks();
+    const imageAssigned = buildRandomImageAssignments();
+    const textAssigned = buildRandomTextAssignments();
+    setBlocks(prev => {
+      const withImages = imageAssigned.length ? upsertAssignedBlocks(prev, imageAssigned) : prev;
+      const withText = textAssigned.length ? upsertAssignedBlocks(withImages, textAssigned) : withImages;
+      return randomizeCanvasSections(withText);
+    });
   };
 
   // Add global key listener for deleting blocks
@@ -1005,7 +1205,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedIds, isLocked, history]);
 
-  const exportSVG = () => {
+  const buildLayoutSvgMarkup = () => {
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('width', String(canvasSize.width));
@@ -1018,10 +1218,11 @@ export default function App() {
     bg.setAttribute('fill', '#ffffff');
     svg.appendChild(bg);
     blocks.forEach(block => {
-      const x = MARGIN + block.x * (gridMetrics.colWidth + GUTTER);
-      const y = MARGIN + block.y * (gridMetrics.rowHeight + GUTTER);
-      const w = block.w * gridMetrics.colWidth + (block.w - 1) * GUTTER;
-      const h = block.h * gridMetrics.rowHeight + (block.h - 1) * GUTTER;
+      const rect = getBlockRect(block, gridMetrics);
+      const x = gridMetrics.margin + rect.left;
+      const y = gridMetrics.margin + rect.top;
+      const w = rect.width;
+      const h = rect.height;
       const isTextLayer = isTextBlock(block.type);
       const backgroundColor = block.backgroundColor || (isTextLayer ? 'transparent' : '#ffffff');
 
@@ -1173,156 +1374,137 @@ export default function App() {
         svg.appendChild(textEl);
       }
     });
-    const blob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
+    return svg.outerHTML;
+  };
+
+  const renderCleanBoardJpeg = async () => {
+    const svgMarkup = buildLayoutSvgMarkup();
+    const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Failed to render canvas preview.'));
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(canvasSize.width);
+      canvas.height = Math.round(canvasSize.height);
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas rendering is not available.');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg', 0.92);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const exportSVG = () => {
+    const blob = new Blob([buildLayoutSvgMarkup()], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
     a.download = `gridsys_layout_${canvasViewportLabel.toLowerCase()}.svg`; a.click();
     URL.revokeObjectURL(url);
   };
 
+  const startAiPreviewGeneration = async () => {
+    setAiConfirmOpen(false);
+    setAiGenerationError(null);
+    setAiPreviewImage(null);
+    setAiGenerating(true);
+    setIsLocked(true);
+
+    try {
+      const boardImage = await renderCleanBoardJpeg();
+      const response = await fetch('/api/generate-ai-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          boardImage,
+          canvas: {
+            width: canvasSize.width,
+            height: canvasSize.height,
+            label: canvasViewportLabel
+          }
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || 'AI preview generation failed.');
+      }
+      if (!result.imageUrl) {
+        throw new Error('AI did not return an image.');
+      }
+      setAiPreviewImage(result.imageUrl);
+    } catch (error) {
+      setAiGenerationError(error instanceof Error ? error.message : 'AI preview generation failed.');
+      setIsLocked(false);
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const exitAiPreview = () => {
+    setAiPreviewImage(null);
+    setAiGenerationError(null);
+    setIsLocked(false);
+  };
+
+  const downloadAiPreviewJpg = async () => {
+    if (!aiPreviewImage) return;
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Unable to prepare image download.'));
+      img.src = aiPreviewImage;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth || image.width;
+    canvas.height = image.naturalHeight || image.height;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0);
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/jpeg', 0.95);
+    link.download = `gridsys_ai_preview_${Date.now()}.jpg`;
+    link.click();
+  };
+
   const handleZoom = (delta: number) => {
     setZoom(prev => Math.min(Math.max(prev + delta, 0.4), 1.5));
   };
 
-  const analyzeImageAssetsWithAI = async (assets: ImageAsset[]) => {
-    const analyzableAssets = assets.filter(asset => asset.role !== 'reference');
-    if (!analyzableAssets.length) return;
-    const analyzingIds = analyzableAssets.map(asset => asset.id);
-    setAssetAnalysisPendingIds(prev => Array.from(new Set([...prev, ...analyzingIds])));
-
-    try {
-      const previewAssets = await Promise.all(analyzableAssets.map(async asset => ({
-        id: asset.id,
-        name: asset.name,
-        role: asset.role,
-        width: asset.width,
-        height: asset.height,
-        assetProfile: asset.assetProfile,
-        dataUrl: await createImagePreviewDataUrl(asset.dataUrl)
-      })));
-      const response = await fetch('/api/generate-layout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'analyze-assets',
-          imageAssets: previewAssets
-        })
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Asset analysis failed.');
-      }
-      const profileMap = new Map<string, AssetProfile>(
-        (result.assetProfiles || []).map((profile: AssetProfile & { assetId: string }) => [
-          profile.assetId,
-          {
-            visualType: profile.visualType,
-            informationDensity: profile.informationDensity,
-            recommendedRole: profile.recommendedRole,
-            subject: profile.subject,
-            bestUse: profile.bestUse,
-            confidence: profile.confidence,
-            reasoning: profile.reasoning,
-            source: 'ai'
-          }
-        ])
-      );
-      setImageAssets(prev => prev.map(asset => {
-        const profile = profileMap.get(asset.id);
-        if (!profile) return asset;
-        return {
-          ...asset,
-          assetProfile: profile,
-          role: asset.role === 'supporting_image' || asset.assetProfile?.source === 'local'
-            ? profile.recommendedRole
-            : asset.role
-        };
-      }));
-    } catch (err: any) {
-      setChatMessages(prev => [...prev, {
-        role: 'ai',
-        text: language === 'zh'
-          ? `图片理解暂时不可用，已使用本地初始标签继续：${err.message}`
-          : `Image understanding is unavailable for now. Local asset profiles will be used: ${err.message}`
-      }]);
-    } finally {
-      setAssetAnalysisPendingIds(prev => prev.filter(id => !analyzingIds.includes(id)));
-    }
-  };
-
-  const readImageAsset = (
-    file: File,
-    indexInBatch: number,
-    forcedRole?: ImageAssetRole
-  ): Promise<ImageAsset> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      const image = new Image();
-      image.onload = () => {
-        const fallbackRole = forcedRole || (imageAssets.length + indexInBatch === 0 ? 'hero_image' : 'supporting_image');
-        const assetProfile = forcedRole === 'reference'
-          ? undefined
-          : inferLocalAssetProfile(file.name, image.naturalWidth, image.naturalHeight, fallbackRole as Exclude<ImageAssetRole, 'reference'>);
-        resolve({
-          id: createLocalId(),
-          name: file.name.replace(/\.[^.]+$/, ''),
-          dataUrl,
-          role: forcedRole || assetProfile?.recommendedRole || fallbackRole,
-          width: image.naturalWidth,
-          height: image.naturalHeight,
-          assetProfile
-        });
-      };
-      image.onerror = () => reject(new Error(`Failed to read image: ${file.name}`));
-      image.src = dataUrl;
-    };
-    reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
-    reader.readAsDataURL(file);
-  });
-
   const handleImageAssetUpload = (files: FileList | File[], forcedRole?: ImageAssetRole) => {
     const nextFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    const limitedFiles = nextFiles.slice(0, Math.max(0, 24 - imageAssets.length));
-    void Promise.all(limitedFiles.map((file, index) => readImageAsset(file, index, forcedRole)))
-      .then(nextAssets => {
-        setImageAssets(prev => [...prev, ...nextAssets]);
-        if (!forcedRole) {
-          void analyzeImageAssetsWithAI(nextAssets);
-        }
-      })
-      .catch((err: Error) => {
-        setChatMessages(prev => [...prev, {
-          role: 'ai',
-          text: language === 'zh' ? `图片读取失败：${err.message}` : `Image upload failed: ${err.message}`
-        }]);
-      });
-  };
-
-  const updateAssetProfile = (assetId: string, updates: Partial<AssetProfile>) => {
-    setImageAssets(prev => prev.map(asset => {
-      if (asset.id !== assetId) return asset;
-      const currentProfile = asset.assetProfile || inferLocalAssetProfile(asset.name, asset.width, asset.height, asset.role === 'reference' ? 'supporting_image' : asset.role);
-      const visualType = updates.visualType || currentProfile.visualType;
-      const recommendedRole = updates.recommendedRole || (
-        updates.visualType ? VISUAL_TYPE_ROLE_MAP[visualType] : currentProfile.recommendedRole
-      );
-      const nextProfile: AssetProfile = {
-        ...currentProfile,
-        ...updates,
-        visualType,
-        recommendedRole,
-        source: 'ai'
+    nextFiles.slice(0, Math.max(0, 24 - imageAssets.length)).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        const image = new Image();
+        image.onload = () => {
+          setImageAssets(prev => [
+            ...prev,
+            {
+              id: createLocalId(),
+              name: file.name.replace(/\.[^.]+$/, ''),
+              dataUrl,
+              role: forcedRole || (prev.length === 0 ? 'hero_image' : 'supporting_image'),
+              width: image.naturalWidth,
+              height: image.naturalHeight
+            }
+          ]);
+        };
+        image.src = dataUrl;
       };
-
-      return {
-        ...asset,
-        role: asset.role === 'reference' ? asset.role : recommendedRole,
-        assetProfile: nextProfile
-      };
-    }));
+      reader.readAsDataURL(file);
+    });
   };
 
   const addTextAsset = () => {
@@ -1340,434 +1522,163 @@ export default function App() {
     setNewTextAsset('');
   };
 
-  const buildContentJSON = (userMessage: string, detectedStage: string): ContentJSON => {
-    const enabledTextAssets = textAssetsEnabled ? textAssets : [];
-    const layoutImages = imageAssets.filter(asset => asset.role !== 'reference');
-    const titleAsset = enabledTextAssets.find(asset => asset.role === 'title');
-    const subtitleAsset = enabledTextAssets.find(asset => asset.role === 'subtitle');
-    const bodyAssets = enabledTextAssets.filter(asset => asset.role === 'body');
-    const captionAsset = enabledTextAssets.find(asset => asset.role === 'caption');
-    const labelAsset = enabledTextAssets.find(asset => asset.role === 'label');
-    const heroImage = layoutImages.find(asset => asset.role === 'hero_image') || layoutImages[0];
-    const supportImages = layoutImages.filter(asset => asset.id !== heroImage?.id);
-    const diagramImage = layoutImages.find(asset => asset.role === 'diagram_image') || supportImages[0];
-    const chartImage = layoutImages.find(asset => asset.role === 'data_visualization') || supportImages[1] || diagramImage;
-    const portraitImage = layoutImages.find(asset => asset.role === 'portrait_image') || supportImages[2] || heroImage;
-    const productImage = layoutImages.find(asset => asset.role === 'product_image') || supportImages[3] || heroImage;
-    const backgroundImage = layoutImages.find(asset => asset.role === 'background_image') || heroImage;
-    const iconImage = layoutImages.find(asset => asset.role === 'icon_image') || supportImages[4] || diagramImage;
-    const combinedText = [userMessage, ...enabledTextAssets.map(asset => asset.content)].join('\n');
-    const statistic = combinedText.match(/\b\d+(?:\.\d+)?%|\b\d+(?:,\d{3})*(?:\.\d+)?\b/)?.[0];
+  const renderAssetsPanel = () => (
+    <CollapsibleSection
+      title={t.assets}
+      icon={<ImageIcon size={13} />}
+      collapsed={collapsedSections.assets}
+      onToggle={() => toggleSection('assets')}
+      meta={`${textAssets.length} TXT / ${imageAssets.filter(asset => asset.role !== 'reference').length} IMG`}
+    >
+      <div>
+        <div className="mb-2">
+          <span className="block text-[9px] font-black uppercase tracking-widest text-swiss-black/55">{t.useTextAssets}</span>
+          <span className="block mt-1 text-[9px] leading-tight text-swiss-black/35">
+            {language === 'zh' ? '先添加文字。body 会按正文文本顺序进入模板；title 会优先进入标题位。' : 'Add text first. Body fills text slots in order; title fills the title slot first.'}
+          </span>
+        </div>
+        <div className="grid grid-cols-5 gap-1 mb-2">
+          {(['title', 'subtitle', 'body', 'caption', 'label'] as TextAssetRole[]).map(role => (
+            <button
+              key={role}
+              onClick={() => setNewTextRole(role)}
+              className={`h-7 text-[8px] font-black uppercase border transition-colors ${
+                newTextRole === role
+                  ? 'bg-swiss-black text-white border-swiss-black'
+                  : 'bg-white/50 border-swiss-black/10 text-swiss-black/45 hover:text-swiss-red hover:border-swiss-red'
+              }`}
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={newTextAsset}
+          onChange={(event) => setNewTextAsset(event.target.value)}
+          placeholder={language === 'zh' ? '粘贴标题、正文、说明文字...' : 'Paste titles, body copy, captions...'}
+          className="w-full h-20 resize-none bg-white/70 border border-swiss-black/10 p-2 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-swiss-black/25"
+        />
+        <button
+          onClick={addTextAsset}
+          disabled={!newTextAsset.trim()}
+          className="mt-2 w-full h-8 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
+        >
+          {t.addText}
+        </button>
+        <div className="mt-3 space-y-2">
+          {textAssets.map(asset => (
+            <div key={asset.id} className="group border border-swiss-black/10 bg-white/60 p-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[8px] font-black uppercase tracking-widest text-swiss-red">{asset.role}</span>
+                <button
+                  onClick={() => setTextAssets(prev => prev.filter(item => item.id !== asset.id))}
+                  className="text-swiss-black/25 hover:text-swiss-red"
+                  title={language === 'zh' ? '移除文字' : 'Remove text'}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              <p className="text-[10px] leading-snug text-swiss-black/70 line-clamp-3 whitespace-pre-wrap">{asset.content}</p>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={randomAssignTextToBlocks}
+          disabled={textAssets.length === 0 || !activeTemplate}
+          className="mt-3 w-full h-9 bg-white border border-swiss-black/10 text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:border-swiss-red hover:text-swiss-red transition-colors"
+        >
+          {language === 'zh' ? '按模板分配文字' : 'Assign Text by Template'}
+        </button>
+      </div>
 
-    return {
-      projectId: 'local_project',
-      stage: detectedStage,
-      contentTypes: textAssets.map(asset => asset.role),
-      content: {
-        page_title: titleAsset?.content || subtitleAsset?.content || userMessage.split('\n')[0] || 'Portfolio Page',
-        background_summary: bodyAssets[0]?.content || userMessage,
-        section_heading: labelAsset?.content || 'Evidence Mapping',
-        evidence_caption: captionAsset?.content || bodyAssets[1]?.content || userMessage,
-        research_question: textAssets.find(asset => asset.content.toLowerCase().includes('how might we'))?.content || 'How might we frame the opportunity?',
-        inspiration_title: titleAsset?.content || userMessage.split('\n')[0] || 'Research Background',
-        inspiration_subtitle: subtitleAsset?.content || labelAsset?.content || 'Context and research origin',
-        inspiration_body_summary: bodyAssets[0]?.content || userMessage,
-        documentary_caption_left: captionAsset?.content || bodyAssets[1]?.content,
-        documentary_caption_right: bodyAssets[2]?.content || captionAsset?.content,
-        user_identification_title: 'User Identification',
-        early_user_note: bodyAssets[1]?.content || bodyAssets[0]?.content,
-        core_user_note: bodyAssets[2]?.content || bodyAssets[0]?.content,
-        late_user_note: bodyAssets[3]?.content || bodyAssets[0]?.content,
-        target_group: labelAsset?.content || subtitleAsset?.content || bodyAssets[0]?.content,
-        manifestations_title: 'Manifestations & Pain Points',
-        manifestations_body_summary: bodyAssets[1]?.content || bodyAssets[0]?.content,
-        symptom_blurred_vision: statistic,
-        symptom_word_overlap: statistic,
-        symptom_difficulty_spelling: statistic,
-        symptom_letter_confusion: statistic,
-        manifestations_summary: bodyAssets[2]?.content || userMessage,
-        negative_effect_title: 'Negative Effect',
-        findings_title: 'Findings',
-        finding_multi_sensory_title: labelAsset?.content || 'Finding 01',
-        finding_multi_sensory_summary: bodyAssets[1]?.content || userMessage,
-        finding_customized_guidance_title: 'Finding 02',
-        finding_customized_guidance_summary: bodyAssets[2]?.content || bodyAssets[0]?.content,
-        finding_systematic_teaching_title: 'Finding 03',
-        finding_systematic_teaching_summary: bodyAssets[3]?.content || bodyAssets[0]?.content,
-        context_text: subtitleAsset?.content || bodyAssets[0]?.content || userMessage,
-        function_text: bodyAssets[0]?.content || userMessage,
-        usage_text: bodyAssets[1]?.content || captionAsset?.content || userMessage,
-        image_caption: captionAsset?.content,
-        key_statistic: statistic,
-        context_visual: heroImage?.id,
-        category_collage_image: backgroundImage?.id,
-        category_summary_image: diagramImage?.id || heroImage?.id,
-        context_visual_a: portraitImage?.id || heroImage?.id,
-        context_visual_b: productImage?.id || supportImages[0]?.id || heroImage?.id,
-        statistic_image_a: chartImage?.id || heroImage?.id,
-        statistic_image_b: diagramImage?.id || supportImages[1]?.id || heroImage?.id,
-        statistic_image_c: iconImage?.id || supportImages[2]?.id || heroImage?.id,
-        statistic_image_d: supportImages[3]?.id || heroImage?.id,
-        case_image_a: portraitImage?.id || supportImages[0]?.id || heroImage?.id,
-        case_image_b: productImage?.id || supportImages[1]?.id || heroImage?.id,
-        case_image_c: diagramImage?.id || supportImages[2]?.id || heroImage?.id,
-        case_image_d: supportImages[3]?.id || heroImage?.id,
-        documentary_image_left: portraitImage?.id || supportImages[0]?.id || heroImage?.id,
-        documentary_image_right: productImage?.id || supportImages[1]?.id || heroImage?.id,
-        age_0_6_child_image: portraitImage?.id || heroImage?.id,
-        age_0_6_curve_diagram: diagramImage?.id || supportImages[0]?.id || heroImage?.id,
-        age_6_15_child_image: portraitImage?.id || supportImages[1]?.id || heroImage?.id,
-        age_6_15_curve_diagram: chartImage?.id || supportImages[2]?.id || heroImage?.id,
-        age_above_15_child_image: portraitImage?.id || supportImages[3]?.id || heroImage?.id,
-        age_above_15_curve_diagram: diagramImage?.id || supportImages[4]?.id || heroImage?.id,
-        manifestations_child_image: portraitImage?.id || heroImage?.id,
-        brain_illustration: diagramImage?.id || supportImages[0]?.id || heroImage?.id,
-        negative_effect_emotional_group: portraitImage?.id || supportImages[1]?.id || heroImage?.id,
-        negative_effect_neurological_group: diagramImage?.id || supportImages[2]?.id || heroImage?.id,
-        negative_effect_support_group: supportImages[3]?.id || heroImage?.id,
-        hero_usage_image: heroImage?.id,
-        main_usage_image: heroImage?.id,
-        secondary_usage_image: supportImages[0]?.id,
-        component_image: supportImages[1]?.id || supportImages[0]?.id,
-        material_detail_image: supportImages[2]?.id || supportImages[1]?.id,
-        hero_outcome_image: heroImage?.id,
-        component_spread_image: supportImages[0]?.id || heroImage?.id,
-        testing_image_a: supportImages[1]?.id || heroImage?.id,
-        testing_image_b: supportImages[2]?.id || supportImages[0]?.id,
-        scenario_image_foot: supportImages[3]?.id || supportImages[0]?.id,
-        scenario_image_hands: supportImages[4]?.id || supportImages[1]?.id,
-        scenario_image_arm: supportImages[5]?.id || supportImages[2]?.id,
-        module_card_foot: supportImages[6]?.id || supportImages[0]?.id,
-        module_card_hands: supportImages[7]?.id || supportImages[1]?.id,
-        module_card_arm: supportImages[8]?.id || supportImages[2]?.id,
-        diagram_overlay_image: supportImages[9]?.id || supportImages[0]?.id,
-        participant_a_feedback: captionAsset?.content || bodyAssets[0]?.content,
-        participant_b_feedback: bodyAssets[1]?.content,
-        participant_c_feedback: bodyAssets[2]?.content,
-        participant_d_feedback: bodyAssets[3]?.content
-      }
-    };
-  };
+      <div className="mt-4 border-t border-swiss-black/10 pt-3">
+        <button
+          onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = true;
+            input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || []);
+            input.click();
+          }}
+          className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
+        >
+          <Upload size={13} />
+          {t.uploadImages}
+        </button>
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          {imageAssets.filter(asset => asset.role !== 'reference').map(asset => (
+            <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
+              <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
+              <button
+                onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                title={language === 'zh' ? '移除图片' : 'Remove image'}
+              >
+                <X size={12} />
+              </button>
+              <select
+                value={asset.role}
+                onChange={(event) => setImageAssets(prev => prev.map(item => (
+                  item.id === asset.id ? { ...item, role: event.target.value as ImageAssetRole } : item
+                )))}
+                className="absolute left-1 bottom-1 max-w-[calc(100%-8px)] bg-white/90 border border-swiss-black/15 text-[8px] font-black uppercase outline-none"
+                title="Image role"
+              >
+                {IMAGE_ROLE_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={randomAssignImagesToBlocks}
+          disabled={imageAssets.filter(asset => asset.role !== 'reference').length === 0 || !activeTemplate}
+          className="mt-3 w-full h-9 bg-white border border-swiss-black/10 text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:border-swiss-red hover:text-swiss-red transition-colors"
+        >
+          {language === 'zh' ? '按尺寸分配图片' : 'Assign Images by Size'}
+        </button>
+      </div>
+    </CollapsibleSection>
+  );
 
-  const hydrateRenderJSONImages = (renderJSON: RenderJSON): RenderJSON => ({
-    ...renderJSON,
-    elements: renderJSON.elements.map(element => {
-      if (element.type !== 'image') return element;
-      const asset = imageAssets.find(item => item.id === element.src);
-      return asset ? { ...element, src: asset.dataUrl } : element;
-    })
-  });
-
-  const buildTemplatePreviewRenderJSON = (template: TemplateJSON, userMessage: string): RenderJSON => {
-    void userMessage;
-    const imageRoleLabel = (role: string) => {
-      if (/portrait|participant|user|interview/i.test(role)) return language === 'zh' ? '人物、用户或访谈照片' : 'portrait, user, or interview photo';
-      if (/chart|data|stat|visualization/i.test(role)) return language === 'zh' ? '数据图表、统计图或信息图' : 'chart, statistic, or infographic';
-      if (/diagram|map|flow|system|process/i.test(role)) return language === 'zh' ? '结构图、流程图或系统图' : 'diagram, map, or process visual';
-      if (/product|prototype|component|material|outcome/i.test(role)) return language === 'zh' ? '产品、原型、组件或材料照片' : 'product, prototype, component, or material photo';
-      if (/hero|background|context/i.test(role)) return language === 'zh' ? '清晰主视觉、场景图或背景图' : 'clear hero, context, or background image';
-      return language === 'zh' ? '与该槽位语义匹配的图片' : 'image matching this slot intent';
-    };
-    const textSlotLabel = (element: NonNullable<TemplateJSON['elements']>[number], index: number) => {
-      const role = `${element.role} ${element.slotId} ${element.style || ''}`.toLowerCase();
-      if (element.style === 'title' || /title|headline|hero/.test(role)) {
-        return language === 'zh' ? '页面主标题：概括本页调研主题或核心问题' : 'Page title: summarize the research topic or core question';
-      }
-      if (element.style === 'heading' || /heading|section|subtitle/.test(role)) {
-        return language === 'zh' ? '章节标题：标注这一组信息的调研维度' : 'Section heading: name this research dimension';
-      }
-      if (element.type === 'caption' || /caption|note|annotation|label/.test(role)) {
-        return language === 'zh' ? '说明文字：解释图片、数据或关键发现' : 'Caption: explain the image, data, or key finding';
-      }
-      if (/question|hmw|opportunity/.test(role)) {
-        return language === 'zh' ? '机会点文本：放设计问题、洞察或 How Might We' : 'Opportunity text: design question, insight, or HMW';
-      }
-      if (/data|stat|evidence|finding/.test(role)) {
-        return language === 'zh' ? '证据文本：放调研数据、发现或论据摘要' : 'Evidence text: research data, finding, or proof summary';
-      }
-      if (/user|participant|interview/.test(role)) {
-        return language === 'zh' ? '用户文本：放用户画像、访谈摘录或行为洞察' : 'User text: persona, interview quote, or behavior insight';
-      }
-      return language === 'zh' ? `正文文本 ${index + 1}：放调研背景、分析或结论摘要` : `Body text ${index + 1}: research background, analysis, or conclusion summary`;
-    };
-    const generatedTextForSlot = (element: NonNullable<TemplateJSON['elements']>[number], index: number) => {
-      if (element.type === 'image') {
-        return `${language === 'zh' ? '图片槽位' : 'Image slot'}\n${imageRoleLabel(element.role)}\n${language === 'zh' ? '不匹配可留空或稍后替换' : 'Leave blank if no matching asset exists'}`;
-      }
-      return textSlotLabel(element, index);
-    };
-
-    return {
-      templateId: `${template.templateMeta.templateId}_preview`,
-      canvas: {
-        width: template.grid.columns,
-        height: template.grid.rows
-      },
-      elements: (template.elements || []).map((element, index) => {
-      const isImageSlot = element.type === 'image';
-      return {
-        type: isImageSlot ? 'caption' : element.type,
-        id: `preview_${element.slotId}`,
-        sourceSlotId: element.slotId,
-        previewSlotKind: isImageSlot ? 'image' : 'text',
-        x: element.x,
-        y: element.y,
-        w: element.w,
-        h: element.h,
-        style: isImageSlot ? 'caption' : element.style,
-        crop: element.crop,
-        zIndex: element.zIndex || index + 1,
-        content: generatedTextForSlot(element, index),
-        backgroundColor: isImageSlot ? '#ffffff' : 'transparent',
-        textRules: {
-          maxChars: isImageSlot ? 72 : 72,
-          fontSize: isImageSlot ? 8 : Math.min(element.textRules?.fontSize || 10, 10),
-          lineClamp: isImageSlot ? 4 : 3,
-          overflow: 'clip',
-          padding: isImageSlot ? 4 : 5
-        }
-      };
-    })
-    };
-  };
-
-  const getPreviewTemplate = () => {
-    if (referenceMode === 'upload') return uploadedReferenceTemplate;
-    const fallbackTemplateId = selectedTemplateId === 'auto'
-      ? getDefaultTemplateForStage(pageStage, canvasPresetId)
-      : selectedTemplateId;
-    return availableTemplates.find(template => template.templateMeta.templateId === fallbackTemplateId)
-      || availableTemplates.find(template => template.templateMeta.doubleDiamondStage === pageStage)
-      || availableTemplates[0];
-  };
-
-  const getPlanTemplate = () => {
-    const templateId = pendingLayoutPreview?.templateId || selectedTemplateId;
-    if (referenceMode === 'upload') return uploadedReferenceTemplate;
-    if (templateId && templateId !== 'auto') {
-      return availableTemplates.find(template => template.templateMeta.templateId === templateId) || getPreviewTemplate();
-    }
-    return getPreviewTemplate();
-  };
-
-  const buildPreviewPlanFromBlocks = (): PreviewPlanItem[] => blocks.reduce<PreviewPlanItem[]>((plan, block) => {
-      const planTemplate = getPlanTemplate();
-      const templateColumns = planTemplate?.grid?.columns || COLUMNS;
-      const templateRows = planTemplate?.grid?.rows || ROWS;
-      const toTemplateX = (value: number) => Math.round((value / COLUMNS) * templateColumns);
-      const toTemplateY = (value: number) => Math.round((value / ROWS) * templateRows);
-      const slotId = block.sourceSlotId || block.id.replace(/^preview_/, '').replace(/-\d+$/, '');
-      if (!slotId) return plan;
-      const x = clampValue(toTemplateX(block.x), 0, templateColumns - 1);
-      const y = clampValue(toTemplateY(block.y), 0, templateRows - 1);
-      const w = clampValue(toTemplateX(block.w), 1, templateColumns - x);
-      const h = clampValue(toTemplateY(block.h), 1, templateRows - y);
-      plan.push({
-        slotId,
-        type: block.type,
-        x,
-        y,
-        w,
-        h,
-        note: block.label,
-        fontSize: block.fontSize,
-        lineClamp: block.lineClamp
-      });
-      return plan;
-    }, []);
-
-  const generateUploadedReferenceTemplate = async () => {
-    const referenceImageAssets = imageAssets.filter(asset => asset.role === 'reference');
-    if (!referenceImageAssets.length) {
-      setChatMessages(prev => [...prev, {
-        role: 'ai',
-        text: language === 'zh' ? '请先上传参考图。' : 'Please upload a reference image first.'
-      }]);
-      return;
-    }
-
-    setReferenceTemplateLoading(true);
-    try {
-      const response = await fetch('/api/generate-layout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'generate-reference-template',
-          canvasPresetId,
-          prompt: language === 'zh'
-            ? '只分析参考图的版式结构，生成可复用模板。'
-            : 'Analyze only the reference layout structure and generate a reusable template.',
-          referenceMode: 'upload',
-          referenceImages: referenceImageAssets.map(asset => ({
-            id: asset.id,
-            name: asset.name,
-            role: asset.role,
-            width: asset.width,
-            height: asset.height,
-            dataUrl: asset.dataUrl
-          }))
-        })
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || '参考模板生成失败。');
-      }
-
-      rememberBlocks();
-      setUploadedReferenceTemplate(result.referenceTemplate);
-      setPendingLayoutPreview(null);
-      setLastRenderJSON(result.renderJSON);
-      setBlocks(renderJSONToLayoutBlocks(result.renderJSON));
-      selectOnly(null);
-      setChatMessages(prev => [...prev, {
-        role: 'ai',
-        text: language === 'zh'
-          ? `参考模板已生成：${result.referenceTemplate?.elements?.length || 0} 个槽位。下一步可以生成排版，让 AI 分配图片和文本。`
-          : `Reference template generated with ${result.referenceTemplate?.elements?.length || 0} slots. Next, generate the layout to assign images and text.`
-      }]);
-    } catch (err: any) {
-      setChatMessages(prev => [...prev, { role: 'ai', text: `参考模板生成失败: ${err.message}` }]);
-    } finally {
-      setReferenceTemplateLoading(false);
-    }
-  };
-
-  const showTemplatePreviewBeforeLayout = (userMessage: string) => {
-    const template = getPreviewTemplate();
-    if (!template) {
-      throw new Error(language === 'zh' ? '模板还没有加载完成，请稍后再试。' : 'Templates are still loading.');
-    }
-
-    const previewRenderJSON = buildTemplatePreviewRenderJSON(template, userMessage);
-    rememberBlocks();
-    setLayoutMode('editorial');
-    setLastRenderJSON(previewRenderJSON);
-    setPendingLayoutPreview({
-      prompt: userMessage,
-      templateId: template.templateMeta.templateId,
-      referenceMode
-    });
-    setBlocks(renderJSONToLayoutBlocks(previewRenderJSON));
-    selectOnly(null);
-    setChatMessages(prev => [...prev, {
-      role: 'ai',
-      text: language === 'zh'
-        ? `已先展示模板骨架：${template.templateMeta.templateName}。请检查槽位逻辑，确认后再完成最终排版。未匹配图片的槽位会先用文字说明需要的素材。`
-        : `Template structure previewed: ${template.templateMeta.templateName}. Review the slot logic first, then confirm the final layout. Unmatched image slots are labeled with the needed asset type.`
-    }]);
-  };
-
-  const callGeminiLayout = async (userMessage: string, confirmedFinalLayout = false) => {
-    setAiLoading(true);
-    setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
-    setChatInput('');
-
-    try {
-      if (!availableTemplates.length) {
-        throw new Error('模板还没有加载完成，请稍后再试。');
-      }
-
-      if (!confirmedFinalLayout && pendingLayoutPreview) {
-        setChatMessages(prev => [...prev, {
-          role: 'ai',
-          text: language === 'zh'
-            ? '请先使用画板下方的确认按钮完成最终排版。'
-            : 'Use the confirmation button below the canvas to complete the final layout.'
-        }]);
-        return;
-      }
-
-      if (!confirmedFinalLayout && !lastRenderJSON) {
-        showTemplatePreviewBeforeLayout(userMessage);
-        return;
-      }
-
-      const isAiRevision = Boolean(lastRenderJSON) && !pendingLayoutPreview && !confirmedFinalLayout;
-      const contentPrompt = confirmedFinalLayout && pendingLayoutPreview
-        ? pendingLayoutPreview.prompt
-        : isAiRevision
-          ? (lastLayoutPrompt || pendingLayoutPreview?.prompt || userMessage)
-          : userMessage;
-      const editInstruction = isAiRevision ? userMessage : '';
-      const analysis = analyzeProjectContent(contentPrompt);
-      const contentJSON = buildContentJSON(contentPrompt, analysis.detectedStage);
-      const layoutImageAssets = imageAssets.filter(asset => asset.role !== 'reference');
-      const useOwnReference = referenceMode === 'upload';
-      const referenceImageAssets = useOwnReference
-        ? imageAssets.filter(asset => asset.role === 'reference')
-        : [];
-      if (useOwnReference && !uploadedReferenceTemplate) {
-        throw new Error(language === 'zh' ? '请先生成参考模板，再生成排版。' : 'Generate the reference template before generating the layout.');
-      }
-      const response = await fetch('/api/generate-layout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          prompt: contentPrompt,
-          editInstruction,
-          selectedTemplateId: confirmedFinalLayout && pendingLayoutPreview ? pendingLayoutPreview.templateId : selectedTemplateId,
-          canvasPresetId,
-          referenceMode,
-          customTemplate: useOwnReference ? uploadedReferenceTemplate : undefined,
-          previewPlan: (confirmedFinalLayout && pendingLayoutPreview) || isAiRevision ? buildPreviewPlanFromBlocks() : undefined,
-          contentJSON,
-          textAssets: (textAssetsEnabled ? textAssets : []).map(asset => ({
-            id: asset.id,
-            role: asset.role,
-            content: asset.content
-          })),
-          imageAssets: layoutImageAssets.map(asset => ({
-            id: asset.id,
-            name: asset.name,
-            role: asset.role,
-            width: asset.width,
-            height: asset.height,
-            assetProfile: asset.assetProfile
-          })),
-          referenceImages: referenceImageAssets.map(asset => ({
-            id: asset.id,
-            name: asset.name,
-            role: asset.role,
-            width: asset.width,
-            height: asset.height,
-            dataUrl: asset.dataUrl
-          }))
-        })
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'API 生成失败。');
-      }
-
-      const renderJSON = hydrateRenderJSONImages(result.renderJSON);
-      const newBlocks = renderJSONToLayoutBlocks(renderJSON);
-      const template = availableTemplates.find(item => item.templateMeta.templateId === result.selectedTemplate);
-
-      rememberBlocks();
-      setLayoutMode('editorial');
-      setLastRenderJSON(renderJSON);
-      setLastLayoutPrompt(contentPrompt);
-      setPendingLayoutPreview(null);
-      setBlocks(newBlocks);
-      selectOnly(null);
-      setChatMessages(prev => [...prev, {
-        role: 'ai',
-        text: language === 'zh'
-          ? `AI 已生成 Render JSON。参考方式：${useOwnReference ? '上传参考' : (template?.templateMeta.templateName || result.selectedTemplate)}。${result.reasoning || ''}`
-          : `AI generated Render JSON. Reference mode: ${useOwnReference ? 'uploaded reference' : (template?.templateMeta.templateName || result.selectedTemplate)}. ${result.reasoning || ''}`
-      }]);
-    } catch (err: any) {
-      setChatMessages(prev => [...prev, { role: 'ai', text: `生成失败: ${err.message}` }]);
-    } finally {
-      setAiLoading(false);
-    }
-  };
+  const renderLocalAssignmentPanel = () => (
+    <CollapsibleSection
+      title={language === 'zh' ? '3. 本地分配' : '3. Local Assignment'}
+      icon={<Shuffle size={13} />}
+      collapsed={collapsedSections.ai}
+      onToggle={() => toggleSection('ai')}
+      meta="LOCAL"
+    >
+      <div className="border border-swiss-black/10 bg-white/60 p-3">
+        <p className="text-[10px] leading-snug text-swiss-black/55">
+          {language === 'zh'
+            ? '上传素材后可随机填入，也可以把当前页面区块在同类槽位之间随机重排。'
+            : 'Upload assets to fill slots, or shuffle current page sections across compatible slots.'}
+        </p>
+        <button
+          onClick={randomAssignAllAssets}
+          disabled={
+            !activeTemplate ||
+            (imageAssets.filter(asset => asset.role !== 'reference').length === 0 && textAssets.length === 0 && blocks.length === 0)
+          }
+          className="mt-3 w-full h-9 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
+        >
+          {language === 'zh' ? '随机分配并重排' : 'Random Assign + Shuffle'}
+        </button>
+        <button
+          onClick={randomizeCurrentLayout}
+          disabled={!activeTemplate || blocks.length === 0}
+          className="mt-2 w-full h-9 bg-white border border-swiss-black/10 text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:border-swiss-red hover:text-swiss-red transition-colors"
+        >
+          {language === 'zh' ? '只随机重排版面' : 'Shuffle Layout Only'}
+        </button>
+      </div>
+    </CollapsibleSection>
+  );
 
   return (
     <div className="flex h-screen w-screen bg-swiss-grey-base text-swiss-black overflow-hidden select-none">
@@ -1881,10 +1792,22 @@ export default function App() {
             <div 
               onClick={() => setShowGrid(!showGrid)}
               className="w-9 h-4.5 bg-[#333] border border-[#444] relative cursor-pointer"
+              title={language === 'zh' ? '显示/隐藏模板网格' : 'Show or hide template grid'}
             >
               <motion.div 
                 animate={{ left: showGrid ? '20px' : '2px' }}
                 className="absolute top-[2px] w-3 h-3 bg-swiss-red" 
+              />
+            </div>
+            <span className="text-white/35">BASE</span>
+            <div 
+              onClick={() => setShowBaseline(!showBaseline)}
+              className="w-9 h-4.5 bg-[#333] border border-[#444] relative cursor-pointer"
+              title={language === 'zh' ? '显示/隐藏灰色基线' : 'Show or hide gray baseline'}
+            >
+              <motion.div 
+                animate={{ left: showBaseline ? '20px' : '2px' }}
+                className="absolute top-[2px] w-3 h-3 bg-white/70" 
               />
             </div>
           </div>
@@ -1927,7 +1850,12 @@ export default function App() {
             ].map(mode => (
               <button
                 key={mode.value}
-                onClick={() => setSidebarMode(mode.value)}
+                onClick={() => {
+                  setSidebarMode(mode.value);
+                  if (mode.value === 'edit') {
+                    setLayoutMode('editorial');
+                  }
+                }}
                 className={`h-8 text-[10px] font-black uppercase tracking-widest border transition-colors ${
                   sidebarMode === mode.value
                     ? 'bg-swiss-black text-white border-swiss-black'
@@ -1950,7 +1878,7 @@ export default function App() {
                 onToggle={() => toggleSection('pageType')}
                 meta={referenceMode === 'template' ? t.template : t.ownReference}
               >
-                <div className="mb-3 border border-swiss-black/10 bg-white/55 p-1">
+                <div className="grid grid-cols-2 gap-1 mb-3">
                   {[
                     { value: 'template' as const, label: t.template, help: t.templateHelp },
                     { value: 'upload' as const, label: t.ownReference, help: t.ownReferenceHelp },
@@ -1958,60 +1886,80 @@ export default function App() {
                     <button
                       key={option.value}
                       onClick={() => setReferenceMode(option.value)}
-                      className={`inline-flex h-7 w-1/2 items-center justify-center text-[9px] font-black uppercase tracking-widest transition-colors ${
+                      className={`min-h-12 border p-2 text-left transition-colors ${
                         referenceMode === option.value
-                          ? 'bg-swiss-black text-white'
-                          : 'text-swiss-black/40 hover:text-swiss-red'
+                          ? 'bg-swiss-red text-white border-swiss-red'
+                          : 'bg-white/60 text-swiss-black border-swiss-black/10 hover:border-swiss-red'
                       }`}
-                      title={option.help}
                     >
-                      {option.label}
+                      <span className="block text-[10px] font-black uppercase tracking-widest">{option.label}</span>
+                      <span className={`block mt-1 text-[8px] leading-tight ${
+                        referenceMode === option.value ? 'text-white/75' : 'text-swiss-black/35'
+                      }`}>
+                        {option.help}
+                      </span>
                     </button>
                   ))}
-                  <p className="px-1.5 pb-1.5 pt-2 text-[8px] leading-snug text-swiss-black/35">
-                    {referenceMode === 'template' ? t.templateHelp : t.ownReferenceHelp}
-                  </p>
                 </div>
 
                 {referenceMode === 'template' ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-1">
-                      {(['discover', 'define', 'develop', 'deliver'] as PageStage[]).map(stage => {
-                        const templateId = getDefaultTemplateForStage(stage, canvasPresetId);
-                        const template = availableTemplates.find(item => item.templateMeta.templateId === templateId);
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {availableTemplates.map((template, index) => {
+                        const isActive = activeTemplateId === template.templateMeta.templateId;
+                        const templateGrid = getTemplateGridSpec(template, 'a3');
                         return (
                           <button
-                            key={stage}
-                            onClick={() => selectPageStage(stage)}
-                            className={`min-h-12 border p-2 text-left transition-colors ${
-                              pageStage === stage
-                                ? 'bg-swiss-red text-white border-swiss-red'
-                                : 'bg-white/60 text-swiss-black border-swiss-black/10 hover:border-swiss-red'
+                            key={template.templateMeta.templateId}
+                            onClick={() => {
+                              setReferenceMode('template');
+                              loadTemplateBlocks(template);
+                            }}
+                            className={`aspect-[4/3] border flex items-center justify-center transition-colors ${
+                              isActive
+                                ? 'border-swiss-red bg-white cursor-pointer hover:bg-swiss-red/[0.06]'
+                                : 'border-swiss-black/15 bg-white/55 cursor-pointer hover:border-swiss-red hover:bg-white'
                             }`}
                           >
-                            <span className="block text-[10px] font-black uppercase tracking-widest">{t.stages[stage]}</span>
-                            <span className={`block mt-1 text-[8px] leading-tight ${
-                              pageStage === stage ? 'text-white/75' : 'text-swiss-black/35'
-                            }`}>
-                              {template ? template.templateMeta.templateName : stage === 'define' ? t.autoMatch : t.loading}
-                            </span>
+                            <div className="w-full h-full p-2 flex flex-col justify-between text-left">
+                              <div>
+                                <span className={`block text-[8px] font-black uppercase tracking-widest ${isActive ? 'text-swiss-red' : 'text-swiss-black/35'}`}>
+                                  {isActive ? 'ACTIVE A3' : 'A3'}
+                                </span>
+                                <span className="block mt-1 text-[10px] font-black uppercase leading-tight text-swiss-black">
+                                  {language === 'zh' ? `A3 模板 ${index + 1}` : `A3 Template ${index + 1}`}
+                                </span>
+                                <span className="block mt-1 text-[8px] font-bold leading-tight text-swiss-black/35">
+                                  {template.templateMeta.templateName}
+                                </span>
+                              </div>
+                              <div className="font-mono text-[8px] font-bold uppercase text-swiss-black/35">
+                                {templateGrid.columns}x{templateGrid.rows} / M{Number(templateGrid.margin).toFixed(templateGrid.margin % 1 ? 2 : 0)} / B{templateGrid.baseline}
+                              </div>
+                              <span className="block text-[8px] font-black uppercase tracking-widest text-swiss-black/40">
+                                {language === 'zh' ? '点击切换模板' : 'Click to switch'}
+                              </span>
+                            </div>
                           </button>
                         );
                       })}
-                    </div>
-                    <select
-                      value={selectedTemplateId}
-                      onChange={(event) => setSelectedTemplateId(event.target.value)}
-                      className="mt-2 w-full h-8 bg-white border border-swiss-black/10 px-2 text-[10px] font-black uppercase outline-none focus:border-swiss-red"
-                    >
-                      <option value="auto">{t.selectTemplate}</option>
-                      {availableTemplates.map(template => (
-                        <option key={template.templateMeta.templateId} value={template.templateMeta.templateId}>
-                          {template.templateMeta.templateName}
-                        </option>
+                      {[...Array(Math.max(0, 2 - availableTemplates.length))].map((_, index) => (
+                        <div
+                          key={`template-empty-${index}`}
+                          className="aspect-[4/3] border border-dashed border-swiss-black/15 bg-white/45 flex items-center justify-center"
+                        >
+                          <span className="text-[8px] font-black uppercase tracking-widest text-swiss-black/25">
+                            Template {String(index + availableTemplates.length + 1).padStart(2, '0')}
+                          </span>
+                        </div>
                       ))}
-                    </select>
-                  </>
+                    </div>
+                    <div className="border border-swiss-black/10 bg-white/60 p-2 text-[9px] leading-snug text-swiss-black/40">
+                      {language === 'zh'
+                        ? 'A3 模板 1 和 A3 模板 2 都已接入网页。点击模板会切换画布结构；切到自由编辑不会清空当前内容。'
+                        : 'A3 Template 1 and 2 are available. Clicking a template switches the canvas structure; Free Edit keeps current content.'}
+                    </div>
+                  </div>
                 ) : (
                   <div className="border-t border-swiss-black/10 pt-3">
                     <button
@@ -2021,7 +1969,6 @@ export default function App() {
                         input.accept = 'image/*';
                         input.multiple = true;
                         input.onchange = (event) => {
-                          setUploadedReferenceTemplate(null);
                           handleImageAssetUpload((event.target as HTMLInputElement).files || [], 'reference');
                         };
                         input.click();
@@ -2037,7 +1984,6 @@ export default function App() {
                           <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
                           <button
                             onClick={() => {
-                              setUploadedReferenceTemplate(null);
                               setImageAssets(prev => prev.filter(item => item.id !== asset.id));
                             }}
                             className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
@@ -2048,29 +1994,15 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-                    <button
-                      onClick={generateUploadedReferenceTemplate}
-                      disabled={referenceTemplateLoading || imageAssets.filter(asset => asset.role === 'reference').length === 0}
-                      className="mt-3 w-full h-9 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
-                    >
-                      {referenceTemplateLoading
-                        ? (language === 'zh' ? '正在生成模板...' : 'Generating Template...')
-                        : uploadedReferenceTemplate
-                          ? (language === 'zh' ? '重新生成参考模板' : 'Regenerate Template')
-                          : (language === 'zh' ? '生成参考模板' : 'Generate Reference Template')}
-                    </button>
-                    <div className={`mt-2 border p-2 text-[9px] leading-snug ${
-                      uploadedReferenceTemplate
-                        ? 'border-swiss-red/25 bg-swiss-red/5 text-swiss-black/65'
-                        : 'border-swiss-black/10 bg-white/50 text-swiss-black/35'
-                    }`}>
-                      {uploadedReferenceTemplate
-                        ? (language === 'zh'
-                          ? `模板已准备：${uploadedReferenceTemplate.elements?.length || 0} 个槽位。下一步点击底部生成排版。`
-                          : `Template ready: ${uploadedReferenceTemplate.elements?.length || 0} slots. Next, click Generate Layout below.`)
-                        : (language === 'zh'
-                          ? '先生成参考模板，再让 AI 分配图片和文字。'
-                          : 'Generate the reference template first, then let AI assign images and text.')}
+                    <div className="mt-3 border border-dashed border-swiss-black/15 bg-white/45 p-2 text-[9px] leading-snug text-swiss-black/40">
+                      {language === 'zh'
+                        ? '参考图会保留在这里，后续可手动对照调整版面。'
+                        : 'Reference images stay here for manual layout comparison.'}
+                    </div>
+                    <div className="mt-2 border border-swiss-black/10 bg-white/50 p-2 text-[9px] leading-snug text-swiss-black/35">
+                      {language === 'zh'
+                        ? '这里仅保存参考图；当前模板区先留空等待新的 A3 模板缩略图。'
+                        : 'This area only stores reference images; template slots remain reserved for the new A3 thumbnails.'}
                     </div>
                   </div>
                 )}
@@ -2081,144 +2013,16 @@ export default function App() {
                 icon={<ImageIcon size={13} />}
                 collapsed={collapsedSections.assets}
                 onToggle={() => toggleSection('assets')}
-                meta={`${imageAssets.filter(asset => asset.role !== 'reference').length} IMG${textAssetsEnabled ? ` / ${textAssets.length} TXT` : ''}`}
+                meta={`${textAssets.length} TXT / ${imageAssets.filter(asset => asset.role !== 'reference').length} IMG`}
               >
-                <button
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.multiple = true;
-                    input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || []);
-                    input.click();
-                  }}
-                  className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
-                >
-                  <Upload size={13} />
-                  {t.uploadImages}
-                </button>
-                <div className="mt-3 space-y-2">
-                  {imageAssets.filter(asset => asset.role !== 'reference').map(asset => {
-                    const profile = asset.assetProfile || inferLocalAssetProfile(asset.name, asset.width, asset.height, asset.role === 'reference' ? 'supporting_image' : asset.role);
-                    const isAnalyzing = assetAnalysisPendingIds.includes(asset.id);
-                    const confidence = profile.confidence === undefined ? null : Math.round(profile.confidence * 100);
-
-                    return (
-                      <div key={asset.id} className="group border border-swiss-black/10 bg-white/70 p-2">
-                        <div className="flex gap-2">
-                          <div className="relative shrink-0">
-                            <img src={asset.dataUrl} alt={asset.name} className="h-16 w-16 object-cover border border-swiss-black/10" />
-                            <button
-                              onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
-                              className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                              title={language === 'zh' ? '移除图片' : 'Remove image'}
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="truncate text-[9px] font-black uppercase tracking-widest text-swiss-black/65">{asset.name}</p>
-                                <p className="mt-0.5 text-[8px] font-bold uppercase tracking-widest text-swiss-black/35">
-                                  {isAnalyzing
-                                    ? (language === 'zh' ? 'AI 理解中' : 'AI reading')
-                                    : `${profile.source === 'ai' ? 'AI' : 'LOCAL'}${confidence === null ? '' : ` ${confidence}%`}`}
-                                </p>
-                              </div>
-                              <span className={`shrink-0 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest ${
-                                profile.informationDensity === 'high'
-                                  ? 'bg-swiss-red text-white'
-                                  : 'bg-swiss-black/5 text-swiss-black/45'
-                              }`}>
-                                {profile.informationDensity}
-                              </span>
-                            </div>
-
-                            <div className="mt-2 grid grid-cols-3 gap-1">
-                              <select
-                                value={profile.visualType}
-                                onChange={(event) => updateAssetProfile(asset.id, { visualType: event.target.value as AssetVisualType })}
-                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
-                                title={language === 'zh' ? 'AI 判断的图片类型' : 'AI visual type'}
-                              >
-                                {ASSET_VISUAL_TYPE_OPTIONS.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <select
-                                value={profile.informationDensity}
-                                onChange={(event) => updateAssetProfile(asset.id, { informationDensity: event.target.value as AssetInformationDensity })}
-                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
-                                title={language === 'zh' ? '信息密度' : 'Information density'}
-                              >
-                                {ASSET_DENSITY_OPTIONS.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <select
-                                value={profile.recommendedRole}
-                                onChange={(event) => updateAssetProfile(asset.id, { recommendedRole: event.target.value as Exclude<ImageAssetRole, 'reference'> })}
-                                className="h-7 min-w-0 bg-white border border-swiss-black/10 px-1 text-[8px] font-black uppercase outline-none focus:border-swiss-red"
-                                title={language === 'zh' ? '推荐角色' : 'Recommended role'}
-                              >
-                                {IMAGE_ROLE_OPTIONS.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div className="mt-1 space-y-0.5 text-[8px] leading-snug text-swiss-black/40">
-                              {profile.subject && (
-                                <p className="line-clamp-1">
-                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '内容' : 'Subject'}:</span> {profile.subject}
-                                </p>
-                              )}
-                              {profile.bestUse && (
-                                <p className="line-clamp-1">
-                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '适合' : 'Use'}:</span> {profile.bestUse}
-                                </p>
-                              )}
-                              {profile.reasoning && (
-                                <p className="line-clamp-1">
-                                  <span className="font-black text-swiss-black/55">{language === 'zh' ? '理由' : 'Why'}:</span> {profile.reasoning}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-4 border-t border-swiss-black/10 pt-3">
-                  <button
-                    onClick={() => setTextAssetsEnabled(prev => !prev)}
-                    className="w-full flex items-center justify-between text-left"
-                  >
-                    <span>
-                      <span className="block text-[9px] font-black uppercase tracking-widest text-swiss-black/55">{t.useTextAssets}</span>
-                      <span className="block mt-1 text-[9px] leading-tight text-swiss-black/35">
-                        {t.useTextAssetsHelp}
-                      </span>
+                <div>
+                  <div className="mb-2">
+                    <span className="block text-[9px] font-black uppercase tracking-widest text-swiss-black/55">{t.useTextAssets}</span>
+                    <span className="block mt-1 text-[9px] leading-tight text-swiss-black/35">
+                      {language === 'zh' ? '先添加文字。body 会按正文文本 1、正文文本 2 的顺序进入模板；title 会优先进入标题位。' : 'Add text first. Body fills text slot 1 then 2; title fills the title slot first.'}
                     </span>
-                    <span className={`relative block w-9 h-4.5 border transition-colors ${
-                      textAssetsEnabled ? 'bg-swiss-red border-swiss-red' : 'bg-white border-swiss-black/20'
-                    }`}>
-                      <span className={`absolute top-[2px] w-3 h-3 bg-swiss-black transition-all ${
-                        textAssetsEnabled ? 'left-[20px] bg-white' : 'left-[2px]'
-                      }`} />
-                    </span>
-                  </button>
-                  {textAssetsEnabled && (
-                    <div className="mt-3">
+                  </div>
+                  <div>
                       <div className="grid grid-cols-5 gap-1 mb-2">
                         {(['title', 'subtitle', 'body', 'caption', 'label'] as TextAssetRole[]).map(role => (
                           <button
@@ -2247,8 +2051,8 @@ export default function App() {
                       >
                         {t.addText}
                       </button>
-                      <div className="mt-3 space-y-2">
-                        {textAssets.map(asset => (
+	                      <div className="mt-3 space-y-2">
+	                        {textAssets.map(asset => (
                           <div key={asset.id} className="group border border-swiss-black/10 bg-white/60 p-2">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-[8px] font-black uppercase tracking-widest text-swiss-red">{asset.role}</span>
@@ -2261,83 +2065,103 @@ export default function App() {
                               </button>
                             </div>
                             <p className="text-[10px] leading-snug text-swiss-black/70 line-clamp-3 whitespace-pre-wrap">{asset.content}</p>
-                          </div>
-                        ))}
+	                          </div>
+	                        ))}
+	                      </div>
+	                      <button
+	                        onClick={randomAssignTextToBlocks}
+	                        disabled={textAssets.length === 0 || !activeTemplate}
+	                        className="mt-3 w-full h-9 bg-white border border-swiss-black/10 text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:border-swiss-red hover:text-swiss-red transition-colors"
+	                      >
+	                        {language === 'zh' ? '按模板分配文字' : 'Assign Text by Template'}
+	                      </button>
+                </div>
+                </div>
+
+                <div className="mt-4 border-t border-swiss-black/10 pt-3">
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.multiple = true;
+                      input.onchange = (event) => handleImageAssetUpload((event.target as HTMLInputElement).files || []);
+                      input.click();
+                    }}
+                    className="w-full h-10 border border-dashed border-swiss-black/25 bg-white/50 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
+                  >
+                    <Upload size={13} />
+                    {t.uploadImages}
+                  </button>
+                  <div className="grid grid-cols-3 gap-2 mt-3">
+                    {imageAssets.filter(asset => asset.role !== 'reference').map(asset => (
+                      <div key={asset.id} className="relative group bg-white border border-swiss-black/10">
+                        <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
+                        <button
+                          onClick={() => setImageAssets(prev => prev.filter(item => item.id !== asset.id))}
+                          className="absolute top-1 right-1 w-5 h-5 bg-swiss-red text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          title={language === 'zh' ? '移除图片' : 'Remove image'}
+                        >
+                          <X size={12} />
+                        </button>
+                        <select
+                          value={asset.role}
+                          onChange={(event) => setImageAssets(prev => prev.map(item => (
+                            item.id === asset.id ? { ...item, role: event.target.value as ImageAssetRole } : item
+                          )))}
+                          className="absolute left-1 bottom-1 max-w-[calc(100%-8px)] bg-white/90 border border-swiss-black/15 text-[8px] font-black uppercase outline-none"
+                          title="Image role"
+                        >
+                          {IMAGE_ROLE_OPTIONS.map(option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                  <button
+                    onClick={randomAssignImagesToBlocks}
+                    disabled={imageAssets.filter(asset => asset.role !== 'reference').length === 0 || !activeTemplate}
+                    className="mt-3 w-full h-9 bg-white border border-swiss-black/10 text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:border-swiss-red hover:text-swiss-red transition-colors"
+                  >
+                    {language === 'zh' ? '按尺寸分配图片' : 'Assign Images by Size'}
+                  </button>
                 </div>
               </CollapsibleSection>
 
               <CollapsibleSection
-                title={lastRenderJSON ? t.aiEdit : '3. AI'}
-                icon={<Zap size={13} />}
+                title={language === 'zh' ? '3. 本地分配' : '3. Local Assignment'}
+                icon={<Shuffle size={13} />}
                 collapsed={collapsedSections.ai}
                 onToggle={() => toggleSection('ai')}
-                meta={aiLoading ? 'GENERATING' : lastRenderJSON ? 'PROMPT ON' : 'NO PROMPT'}
+                meta="LOCAL"
               >
-                {lastRenderJSON ? (
-                  <div className="border border-swiss-black/10 bg-white/70">
-                    <div className="border-b border-swiss-black/10 p-3">
-                      <p className="text-[10px] leading-snug text-swiss-black/55">
-                        {t.aiEditIntro}
-                      </p>
-                    </div>
-                    <div className="max-h-44 overflow-y-auto p-3 space-y-2">
-                      {chatMessages.length === 0 ? (
-                        <div className="border border-dashed border-swiss-black/15 bg-white/50 p-3 text-[10px] leading-snug text-swiss-black/35">
-                          {language === 'zh' ? 'AI 的反馈会显示在这里。' : 'AI feedback will appear here.'}
-                        </div>
-                      ) : (
-                        chatMessages.slice(-5).map((msg, index) => (
-                          <div
-                            key={`${msg.role}-${index}-${msg.text.slice(0, 12)}`}
-                            className={`p-2 text-[10px] leading-snug border ${
-                              msg.role === 'user'
-                                ? 'ml-6 bg-[#111] border-[#111] text-white'
-                                : 'mr-6 bg-swiss-red/10 border-swiss-red/20 text-swiss-black/75'
-                            }`}
-                          >
-                            <span className={`block mb-1 text-[8px] font-black uppercase tracking-widest ${
-                              msg.role === 'user' ? 'text-white/35' : 'text-swiss-red'
-                            }`}>
-                              {msg.role === 'user' ? (language === 'zh' ? '你' : 'You') : 'AI'}
-                            </span>
-                            {msg.text}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    <div className="border-t border-swiss-black/10 p-2 bg-white">
-                      <textarea
-                        value={chatInput}
-                        onChange={(event) => setChatInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && chatInput.trim() && !aiLoading) {
-                            callGeminiLayout(chatInput.trim());
-                          }
-                        }}
-                        placeholder={t.aiPlaceholder}
-                        className="w-full h-20 resize-none bg-[#111] border border-[#333] text-white p-3 text-[11px] leading-snug outline-none focus:border-swiss-red placeholder:text-white/25"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border border-swiss-black/10 bg-white/60 p-3">
-                    <p className="text-[10px] leading-snug text-swiss-black/55">
-                      {t.generateInfo}
-                    </p>
-                  </div>
-                )}
-                {lastRenderJSON && (
-                  <div className="mt-2 border border-swiss-black/10 bg-white/60 p-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[8px] font-black uppercase tracking-widest text-swiss-black/35">Render JSON</span>
-                      <span className="font-mono text-[8px] text-swiss-red">{lastRenderJSON.elements.length} elements</span>
-                    </div>
-                    <p className="mt-1 text-[9px] font-mono text-swiss-black/45 break-all">{lastRenderJSON.templateId}</p>
-                  </div>
-                )}
+                <div className="border border-swiss-black/10 bg-white/60 p-3">
+                  <p className="text-[10px] leading-snug text-swiss-black/55">
+                    {language === 'zh'
+                      ? '上传素材后可随机填入，也可以把当前页面区块在同类槽位之间随机重排。'
+                      : 'Upload assets to fill slots, or shuffle current page sections across compatible slots.'}
+                  </p>
+                  <button
+                    onClick={randomAssignAllAssets}
+                    disabled={
+                      !activeTemplate ||
+                      (imageAssets.filter(asset => asset.role !== 'reference').length === 0 && textAssets.length === 0 && blocks.length === 0)
+                    }
+                    className="mt-3 w-full h-9 bg-swiss-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red transition-colors"
+                  >
+                    {language === 'zh' ? '随机分配并重排' : 'Random Assign + Shuffle'}
+                  </button>
+                  <button
+                    onClick={randomizeCurrentLayout}
+                    disabled={!activeTemplate || blocks.length === 0}
+                    className="mt-2 w-full h-9 bg-white border border-swiss-black/10 text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:border-swiss-red hover:text-swiss-red transition-colors"
+                  >
+                    {language === 'zh' ? '只随机重排版面' : 'Shuffle Layout Only'}
+                  </button>
+                </div>
               </CollapsibleSection>
             </>
           ) : (
@@ -2360,6 +2184,10 @@ export default function App() {
                   }}
                 />
               </CollapsibleSection>
+
+              {renderAssetsPanel()}
+
+              {renderLocalAssignmentPanel()}
 
               <CollapsibleSection
                 title={t.layoutMode}
@@ -2395,25 +2223,13 @@ export default function App() {
         </div>
         <div className="absolute left-0 right-0 bottom-0 p-4 bg-white/85 border-t border-swiss-black/10 backdrop-blur">
           <button
-            onClick={() => {
-              const defaultPrompt = language === 'zh'
-                ? `根据当前选择的 ${referenceMode === 'template' ? `${pageStage} 模板` : '上传参考图'}，使用已上传图片${textAssetsEnabled ? '和文字素材' : ''}，生成一版作品集排版。`
-                : `Generate a portfolio layout from the current ${referenceMode === 'template' ? `${pageStage} template` : 'uploaded reference image'}, using uploaded images${textAssetsEnabled ? ' and text assets' : ''}.`;
-              const canUseDefaultPrompt = !lastRenderJSON || (referenceMode === 'upload' && Boolean(uploadedReferenceTemplate));
-              const message = canUseDefaultPrompt ? (chatInput.trim() || defaultPrompt) : chatInput.trim();
-              if (message && !aiLoading) callGeminiLayout(message);
-            }}
-            disabled={
-              aiLoading ||
-              referenceTemplateLoading ||
-              (referenceMode === 'upload' && !uploadedReferenceTemplate) ||
-              (Boolean(lastRenderJSON) && !chatInput.trim() && !(referenceMode === 'upload' && uploadedReferenceTemplate))
-            }
+            onClick={() => setAiConfirmOpen(true)}
+            disabled={blocks.length === 0 || aiGenerating}
             className="w-full h-11 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
           >
-            {pendingLayoutPreview
-              ? (language === 'zh' ? '请在画板下方确认' : 'Confirm Below Canvas')
-              : lastRenderJSON ? t.updateWithAI : t.generate}
+            {aiGenerating
+              ? (language === 'zh' ? 'AI 正在生成...' : 'AI Generating...')
+              : (language === 'zh' ? 'AI 预览生成' : 'AI Preview Generate')}
           </button>
         </div>
       </aside>
@@ -2433,7 +2249,11 @@ export default function App() {
         >
           {/* Frame Workspace */}
           <div 
-            className="absolute left-0 top-0 shadow-2xl bg-white overflow-hidden transition-transform duration-300 ease-out"
+            className={`absolute left-0 top-0 bg-white overflow-hidden transition-all duration-300 ease-out ${
+              aiGenerating
+                ? 'shadow-[0_0_44px_rgba(255,51,51,0.45)] ring-2 ring-swiss-red/45 animate-pulse'
+                : 'shadow-2xl'
+            }`}
             style={{
               width: canvasSize.width,
               height: canvasSize.height,
@@ -2443,6 +2263,7 @@ export default function App() {
           >
             <GridView
               showGrid={showGrid}
+              showBaseline={showBaseline}
               label={canvasPreset.label}
               size={canvasSize}
               metrics={gridMetrics}
@@ -2452,11 +2273,11 @@ export default function App() {
             <div 
               id="grid-safe-area"
               ref={safeAreaRef}
-              className="absolute z-20 overflow-hidden"
+              className={`absolute z-20 overflow-hidden ${aiGenerating ? 'pointer-events-none' : ''}`}
               onMouseDown={handleSelectionStart}
               style={{ 
-                top: `${MARGIN}px`, 
-                left: `${MARGIN}px`, 
+                top: `${gridMetrics.margin}px`, 
+                left: `${gridMetrics.margin}px`, 
                 width: `${gridMetrics.safeAreaWidth}px`,
                 height: `${gridMetrics.safeAreaHeight}px`,
                 boxSizing: 'border-box'
@@ -2472,14 +2293,10 @@ export default function App() {
                 const isDragging = dragPreview?.id === block.id;
                 const isSelected = selectedIds.includes(block.id);
                 const isTextLayer = isTextBlock(block.type);
-                const isEditingText = editingTextId === block.id;
-                const isPreviewSkeleton = Boolean(pendingLayoutPreview && block.previewSlotKind);
-                const isPreviewImageSlot = isPreviewSkeleton && block.previewSlotKind === 'image';
-                const isPreviewTextSlot = isPreviewSkeleton && block.previewSlotKind === 'text';
                 const blockOverflowMode = block.overflowMode || (isTextLayer ? 'visible' : 'clip');
-                const rect = isDragging 
+                const rect = isDragging && !block.frame
                   ? getPixelRect(dragPreview!.x, dragPreview!.y, block.w, block.h, gridMetrics)
-                  : getPixelRect(block.x, block.y, block.w, block.h, gridMetrics);
+                  : getBlockRect(block, gridMetrics);
                 const zIndex = isSelected ? (block.zIndex || 1) + 1000 : (block.zIndex || 1);
 
                 return (
@@ -2504,34 +2321,16 @@ export default function App() {
                       }
                     }}
                     onMouseDown={(e) => {
+                      e.stopPropagation();
                       if (isInteractiveTarget(e.target)) return;
-                      if (isTextLayer) {
-                        handleTextBlockMouseDown(e, block);
-                        return;
-                      }
-                      e.stopPropagation();
                       handleDragStart(e, block.id);
-                    }}
-                    onDoubleClick={(e) => {
-                      if (!isTextLayer) return;
-                      e.stopPropagation();
-                      selectOnly(block.id);
-                      setEditingTextId(block.id);
                     }}
                   >
                     <div
                       className={`absolute inset-0 flex flex-col transition-all duration-300 ${
                         blockOverflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
                       } ${
-                        isPreviewImageSlot
-                          ? isSelected
-                            ? 'bg-white border border-swiss-red shadow-xl ring-2 ring-swiss-red ring-offset-2 ring-offset-white text-swiss-black'
-                            : 'bg-white border border-swiss-black/10 shadow-[0_2px_10px_rgba(0,0,0,0.12)] text-swiss-black'
-                          : isPreviewTextSlot
-                            ? isSelected
-                              ? 'bg-transparent border border-swiss-red ring-2 ring-swiss-red ring-offset-2 ring-offset-white'
-                              : 'bg-transparent border border-transparent group-hover:border-swiss-red/30'
-                            : isTextLayer
+                        isTextLayer
                           ? isSelected
                             ? 'border border-swiss-red ring-2 ring-swiss-red ring-offset-2 ring-offset-white'
                             : 'border border-transparent group-hover:border-swiss-red/30'
@@ -2544,11 +2343,11 @@ export default function App() {
                                 : 'bg-white border border-swiss-black/10 text-swiss-black shadow-sm'
                       }`}
                       style={{
-                        backgroundColor: isPreviewSkeleton
-                          ? undefined
+                        backgroundColor: !isSelected && block.backgroundColor && block.backgroundColor !== 'transparent'
+                          ? block.backgroundColor
                           : isTextLayer
-                          ? (block.backgroundColor && block.backgroundColor !== 'transparent' ? block.backgroundColor : 'transparent')
-                          : undefined
+                            ? 'transparent'
+                            : undefined
                       }}
                     >
                       {/* Image Render Layer */}
@@ -2586,7 +2385,7 @@ export default function App() {
                         block.imageUrl ? 'opacity-0' : 'opacity-100'
                       } ${isTextLayer ? '' : (block.w === 1 || block.h === 1 ? 'p-1.5' : 'p-4')}`}>
                         {/* Drag Handle & Label */}
-                        {block.type !== 'title' && !isPreviewImageSlot && (
+                        {block.type !== 'title' && (
                           <div className={`transition-opacity duration-150 ${
                             isSelected ? 'opacity-100' : 'opacity-0'
                           } flex items-center justify-between pr-4 ${isTextLayer ? 'absolute -top-5 left-0 right-0 text-swiss-red' : ''}`}>
@@ -2602,33 +2401,12 @@ export default function App() {
                         <div className={`flex-1 flex flex-col ${isTextLayer ? 'items-start justify-start' : 'items-center justify-center'} ${
                           blockOverflowMode === 'visible' ? 'overflow-visible' : 'overflow-hidden'
                         } relative`}>
-                          {isPreviewImageSlot ? (
-                            <div className="absolute inset-0 flex flex-col justify-between p-4 text-swiss-black">
-                              <div className="flex min-h-[34%] items-center justify-center border-2 border-dashed border-swiss-black/15 text-swiss-black/20">
-                                <div className="flex flex-col items-center gap-2">
-                                  <Upload size={Math.min(46, Math.max(22, rect.height * 0.12))} strokeWidth={2.5} />
-                                  <span className="text-[10px] font-black italic uppercase tracking-tight">Drop Image Here</span>
-                                </div>
-                              </div>
-                              <div className="flex flex-1 items-center justify-center px-2">
-                                <span className="font-black uppercase tracking-tighter leading-none text-center" style={{ fontSize: `${Math.min(28, Math.max(14, rect.height * 0.13))}px` }}>
-                                  IMAGE
-                                </span>
-                              </div>
-                              <div className="flex items-end justify-between border-t border-swiss-black/5 pt-2 font-mono text-[8px] uppercase tracking-[0.18em] text-swiss-black/25">
-                                <div className="flex flex-col leading-tight">
-                                  <span>XY:{block.x}:{block.y}</span>
-                                  <span>WH:{block.w}:{block.h}</span>
-                                </div>
-                                <span>GRID.SYS</span>
-                              </div>
-                            </div>
-                          ) : block.type === 'title' ? (
+                          {block.type === 'title' ? (
                             <div
                               className={`${blockOverflowMode === 'autoHeight' ? 'relative' : 'absolute inset-0'} flex items-start justify-start`}
                               style={{ padding: block.padding ?? 8 }}
                             >
-                              {isEditingText ? (
+                              {isSelected ? (
                                 <textarea
                                   value={block.label}
                                   onChange={(e) => updateBlock(block.id, { label: e.target.value })}
@@ -2669,7 +2447,7 @@ export default function App() {
                               )}
                             </div>
                           ) : block.type === 'text' || block.type === 'heading' ? (
-                            <EditableTextBlock block={block} isSelected={isSelected} isEditing={isEditingText} updateBlock={updateBlock} />
+                            <EditableTextBlock block={block} isSelected={isSelected} updateBlock={updateBlock} />
                           ) : block.type === 'blank' ? (
                             <span className="text-[9px] font-mono font-bold uppercase tracking-widest opacity-50">Blank</span>
                           ) : (
@@ -2679,7 +2457,7 @@ export default function App() {
                           )}
                         </div>
 
-                        {block.type !== 'title' && !isPreviewImageSlot && (!isTextLayer || isSelected) && (
+                        {block.type !== 'title' && (!isTextLayer || isSelected) && (
                           <div className={`transition-opacity duration-150 ${
                             isSelected ? 'opacity-100' : 'opacity-0'
                           } flex items-center justify-between pt-1 border-t font-mono ${block.w === 1 || block.h === 1 ? 'text-[5px]' : 'text-[8px]'} uppercase tracking-widest ${
@@ -2728,42 +2506,6 @@ export default function App() {
             </div>
           </div>
         </div>
-        {pendingLayoutPreview && (
-          <div className="fixed left-[324px] right-[284px] bottom-5 z-[80] border border-swiss-black/10 bg-white/90 backdrop-blur shadow-xl p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-widest text-swiss-red">
-                  {language === 'zh' ? '模板骨架待确认' : 'Template Preview Ready'}
-                </p>
-                <p className="mt-1 truncate text-[10px] leading-snug text-swiss-black/55">
-                  {language === 'zh'
-                    ? '请先检查槽位逻辑。确认后 AI 才会分配图片和文字生成最终排版。'
-                    : 'Review the slot logic first. AI will assign images and text only after confirmation.'}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  onClick={() => {
-                    setPendingLayoutPreview(null);
-                    setLastRenderJSON(null);
-                  }}
-                  className="h-9 px-3 border border-swiss-black/10 bg-white text-[9px] font-black uppercase tracking-widest text-swiss-black/45 hover:border-swiss-red hover:text-swiss-red transition-colors"
-                >
-                  {language === 'zh' ? '继续调整' : 'Keep Editing'}
-                </button>
-                <button
-                  onClick={() => callGeminiLayout(pendingLayoutPreview.prompt, true)}
-                  disabled={aiLoading}
-                  className="h-9 px-4 bg-swiss-red text-white text-[9px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-swiss-red/85 transition-colors"
-                >
-                  {aiLoading
-                    ? (language === 'zh' ? '生成中...' : 'Generating...')
-                    : (language === 'zh' ? '确认并完成排版' : 'Confirm Final Layout')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
       {/* Sidebar Right: Inspector */}
@@ -2771,9 +2513,24 @@ export default function App() {
         <div className="mb-6">
           <h2 className="section-label">{t.inspector}</h2>
           {selectedBlock ? (
-            <div className="flex items-center gap-2 py-2">
-              <div className="w-2 h-2 bg-swiss-red" />
-              <span className="text-[11px] font-black uppercase text-swiss-black tracking-tight">{selectedBlock.label}</span>
+            <div className="py-2 border-b border-black/5">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-swiss-red" />
+                <span className="min-w-0 flex-1 truncate text-[11px] font-black uppercase text-swiss-black tracking-tight">{selectedBlock.label}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-1">
+                {[
+                  { label: 'TYPE', value: selectedBlock.type },
+                  { label: 'XY', value: `${selectedBlock.x + 1}:${selectedBlock.y + 1}` },
+                  { label: 'WH', value: `${selectedBlock.w}:${selectedBlock.h}` },
+                  { label: 'Z', value: selectedBlock.zIndex || 1 },
+                ].map(item => (
+                  <div key={item.label} className="border border-swiss-black/10 bg-white/60 px-1.5 py-1">
+                    <span className="block text-[7px] font-black uppercase tracking-widest text-swiss-black/30">{item.label}</span>
+                    <span className="block mt-0.5 truncate font-mono text-[9px] font-bold text-swiss-black">{item.value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : selectedIds.length > 1 ? (
             <div className="py-2 border-b border-black/5">
@@ -2797,11 +2554,11 @@ export default function App() {
                   <PrecisionSlider 
                     label="GRID_X (COLUMN)" 
                     min={1}
-                    max={COLUMNS - selectedBlock.w + 1}
+                    max={gridMetrics.columns - selectedBlock.w + 1}
                     value={selectedBlock.x + 1} 
                     onChange={(v) => {
                       const newX = v - 1;
-                      const maxW = COLUMNS - newX;
+                      const maxW = gridMetrics.columns - newX;
                       const newW = Math.min(selectedBlock.w, maxW);
                       updateBlock(selectedBlock.id, { x: newX, w: newW }, true);
                       setBlocks(prev => settleBlocks(prev));
@@ -2810,11 +2567,11 @@ export default function App() {
                   <PrecisionSlider 
                     label="GRID_Y (ROW)" 
                     min={1}
-                    max={ROWS - selectedBlock.h + 1}
+                    max={gridMetrics.rows - selectedBlock.h + 1}
                     value={selectedBlock.y + 1} 
                     onChange={(v) => {
                       const newY = v - 1;
-                      const maxH = ROWS - newY;
+                      const maxH = gridMetrics.rows - newY;
                       const newH = Math.min(selectedBlock.h, maxH);
                       updateBlock(selectedBlock.id, { y: newY, h: newH }, true);
                       setBlocks(prev => settleBlocks(prev));
@@ -2823,7 +2580,7 @@ export default function App() {
                   <PrecisionSlider 
                     label="SPAN_W (WIDTH)" 
                     min={1}
-                    max={COLUMNS - selectedBlock.x}
+                    max={gridMetrics.columns - selectedBlock.x}
                     value={selectedBlock.w} 
                     onChange={(v) => {
                       updateBlock(selectedBlock.id, { w: v }, true);
@@ -2833,7 +2590,7 @@ export default function App() {
                   <PrecisionSlider 
                     label="SPAN_H (HEIGHT)" 
                     min={1}
-                    max={ROWS - selectedBlock.y}
+                    max={gridMetrics.rows - selectedBlock.y}
                     value={selectedBlock.h} 
                     onChange={(v) => {
                       updateBlock(selectedBlock.id, { h: v }, true);
@@ -3216,9 +2973,12 @@ export default function App() {
 
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full opacity-10 space-y-2 grayscale">
+            <div className="flex flex-col items-center justify-center h-full text-center space-y-3 grayscale">
               <Box size={48} strokeWidth={1} />
-              <span className="text-[10px] font-mono font-bold">NULL.DATA</span>
+              <span className="text-[10px] font-mono font-bold text-swiss-black/20">NULL.DATA</span>
+              <p className="max-w-[160px] text-[10px] leading-relaxed text-swiss-black/30">
+                {language === 'zh' ? '选择画布里的文字或图片区块后，这里会显示网格、图层和样式参数。' : 'Select a text or image block to edit grid, layer, and style parameters here.'}
+              </p>
             </div>
           )}
         </div>
@@ -3242,6 +3002,103 @@ export default function App() {
       </aside>
 
       <AnimatePresence>
+        {aiConfirmOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[90] bg-black/35 backdrop-blur-[2px] flex items-center justify-center px-6"
+            onMouseDown={() => setAiConfirmOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 14, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 14, opacity: 0 }}
+              onMouseDown={(event) => event.stopPropagation()}
+              className="w-[460px] bg-white border border-swiss-black/10 shadow-2xl p-6"
+            >
+              <div className="flex items-start justify-between gap-5">
+                <div>
+                  <h2 className="text-[13px] font-black uppercase tracking-widest text-swiss-black">
+                    {language === 'zh' ? 'AI 预览生成' : 'AI Preview'}
+                  </h2>
+                  <p className="mt-3 text-[13px] leading-relaxed text-swiss-black/60">
+                    {language === 'zh'
+                      ? 'AI会通过当前的排版格式给你生成一张完整的可视化预览，确定要继续吗？'
+                      : 'AI will generate a complete visual preview from the current layout. Continue?'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAiConfirmOpen(false)}
+                  className="w-8 h-8 border border-swiss-black/10 flex items-center justify-center hover:bg-swiss-red hover:text-white transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-6">
+                <button
+                  onClick={startAiPreviewGeneration}
+                  className="h-11 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest hover:bg-swiss-black transition-colors"
+                >
+                  {language === 'zh' ? '继续' : 'Continue'}
+                </button>
+                <button
+                  onClick={() => setAiConfirmOpen(false)}
+                  className="h-11 bg-white border border-swiss-black/10 text-swiss-black/55 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
+                >
+                  {language === 'zh' ? '我想继续调整' : 'Keep Adjusting'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {(aiPreviewImage || aiGenerationError) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[95] bg-[#111] flex flex-col"
+          >
+            <div className="flex-1 min-h-0 flex items-center justify-center p-8 bg-[#1A1A1A]">
+              {aiPreviewImage ? (
+                <img
+                  src={aiPreviewImage}
+                  alt="AI portfolio preview"
+                  className="max-w-full max-h-full object-contain bg-white shadow-2xl"
+                />
+              ) : (
+                <div className="w-[520px] bg-white p-6 border border-swiss-red/30">
+                  <h2 className="text-[13px] font-black uppercase tracking-widest text-swiss-red">
+                    {language === 'zh' ? '生成失败' : 'Generation Failed'}
+                  </h2>
+                  <p className="mt-3 text-[12px] leading-relaxed text-swiss-black/60">{aiGenerationError}</p>
+                </div>
+              )}
+            </div>
+            <div className="h-20 bg-white border-t border-swiss-black/10 flex items-center justify-center gap-3 px-6">
+              {aiPreviewImage && (
+                <button
+                  onClick={downloadAiPreviewJpg}
+                  className="h-11 px-8 bg-swiss-red text-white text-[10px] font-black uppercase tracking-widest hover:bg-swiss-black transition-colors"
+                >
+                  {language === 'zh' ? '下载 JPG' : 'Download JPG'}
+                </button>
+              )}
+              <button
+                onClick={exitAiPreview}
+                className="h-11 px-8 bg-white border border-swiss-black/10 text-swiss-black/60 text-[10px] font-black uppercase tracking-widest hover:border-swiss-red hover:text-swiss-red transition-colors"
+              >
+                {language === 'zh' ? '退出' : 'Exit'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showGuide && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -3263,7 +3120,7 @@ export default function App() {
               <div className="flex items-start justify-between gap-6">
                 <div>
                   <h2 className="text-[13px] font-black uppercase tracking-widest">新手导航</h2>
-                  <p className="mt-2 text-[12px] leading-relaxed text-swiss-black/55">从左侧选择页面类型、上传素材并输入提示词；中间查看 AI 生成页面；右侧对每个元素进行精细调整。</p>
+                  <p className="mt-2 text-[12px] leading-relaxed text-swiss-black/55">从左侧选择模板占位、上传素材并随机分配；中间整理版面；右侧对每个元素进行精细调整。</p>
                 </div>
                 <button
                   onClick={() => {
@@ -3278,7 +3135,7 @@ export default function App() {
               <div className="grid grid-cols-3 gap-3 mt-5">
                 {[
                   { icon: <Upload size={18} />, title: '素材', body: '在左侧选择页面类型并上传图片，需要时开启文字素材或参考排版。' },
-                  { icon: <Zap size={18} />, title: '生成', body: '第一次不需要写提示词，直接生成；生成后可用 AI Prompt 继续整理版面。' },
+                  { icon: <Shuffle size={18} />, title: '分配', body: '使用随机分配把图片和文字放入当前区块，再手动拖拽和微调。' },
                   { icon: <Settings2 size={18} />, title: '精修', body: '选中画布元素后，用右侧面板调整尺寸、图像和文字细节。' },
                 ].map(item => (
                   <div key={item.title} className="border border-swiss-black/10 p-4 bg-swiss-grey-base/40">
@@ -3305,7 +3162,7 @@ export default function App() {
   );
 }
 
-function EditableTextBlock({ block, isSelected, isEditing, updateBlock }: { block: LayoutBlock, isSelected: boolean, isEditing: boolean, updateBlock: (id: string, updates: Partial<LayoutBlock>, remember?: boolean) => void }) {
+function EditableTextBlock({ block, isSelected, updateBlock }: { block: LayoutBlock, isSelected: boolean, updateBlock: (id: string, updates: Partial<LayoutBlock>, remember?: boolean) => void }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [hasOverflow, setHasOverflow] = useState(false);
   const overflowMode = block.overflowMode || 'visible';
@@ -3325,7 +3182,7 @@ function EditableTextBlock({ block, isSelected, isEditing, updateBlock }: { bloc
     if (el) setHasOverflow(el.scrollHeight > el.clientHeight);
   }, [block.label, block.fontSize, block.w, block.h]);
 
-  if (!isEditing) {
+  if (!isSelected) {
     return (
       <div
         className={`w-full relative leading-snug whitespace-pre-wrap break-words ${
@@ -3340,7 +3197,6 @@ function EditableTextBlock({ block, isSelected, isEditing, updateBlock }: { bloc
             WebkitBoxOrient: 'vertical'
           } : {})
         }}
-        title={isSelected ? 'Double click to edit. Hold briefly, then drag to move.' : undefined}
       >
         {block.label}
       </div>
@@ -3385,43 +3241,120 @@ function EditableTextBlock({ block, isSelected, isEditing, updateBlock }: { bloc
 
 function GridView({
   showGrid,
+  showBaseline,
   label,
   size,
   metrics
 }: {
   showGrid: boolean;
+  showBaseline: boolean;
   label: string;
   size: { width: number; height: number };
   metrics: ReturnType<typeof getGridMetrics>;
 }) {
-  if (!showGrid) return null;
+  if (!showGrid && !showBaseline) return null;
+  const baselineCount = Math.floor(metrics.safeAreaHeight / metrics.baseline) + 1;
+  const baselineColumnCount = Math.floor(metrics.safeAreaWidth / metrics.baseline) + 1;
+  const guideOrigin = metrics.guides?.origin || 'liveArea';
+  const verticalGuides = normalizeGuides(
+    metrics.guides?.vertical,
+    buildModuleGuides(metrics.columns, metrics.colWidth, metrics.gutter)
+  ).filter(guide => guide.kind !== 'liveArea_edge');
+  const horizontalGuides = normalizeGuides(
+    metrics.guides?.horizontal,
+    buildModuleGuides(metrics.rows, metrics.rowHeight, metrics.rowGap)
+  ).filter(guide => guide.kind !== 'liveArea_edge');
+  const guideLeft = (value: number) => guideOrigin === 'canvas' ? value : metrics.margin + value;
+  const guideTop = (value: number) => guideOrigin === 'canvas' ? value : metrics.margin + value;
+  const guideClass = (kind?: string) => kind?.includes('gutter')
+    ? 'bg-swiss-red/55'
+    : kind?.includes('caption') || kind?.includes('band')
+      ? 'bg-swiss-red/35'
+      : 'bg-swiss-red/45';
   return (
     <div className="absolute inset-0 pointer-events-none select-none">
-      <div className="absolute inset-0 border border-transparent opacity-0" style={{ margin: MARGIN - 1 }} />
-      <div 
-        className="absolute inset-0 grid"
-        style={{ 
-          padding: MARGIN,
-          gap: GUTTER,
-          gridTemplateColumns: `repeat(${COLUMNS}, ${metrics.colWidth}px)`,
-          gridTemplateRows: `repeat(${ROWS}, ${metrics.rowHeight}px)`
-        }}
-      >
-        {[...Array(COLUMNS * ROWS)].map((_, i) => (
-          <div key={i} className="w-full h-full relative group">
-            <div className="absolute inset-[1px] border border-transparent bg-swiss-red/[0.025]" />
-            <div className="absolute top-0 left-0 right-0 h-[1px] bg-transparent" />
+      <div className="absolute inset-0 border border-transparent opacity-0" style={{ margin: metrics.margin - 1 }} />
+      {showBaseline && (
+        <div
+          className="absolute overflow-hidden"
+          style={{
+            left: metrics.margin,
+            top: metrics.margin,
+            width: metrics.safeAreaWidth,
+            height: metrics.safeAreaHeight
+          }}
+        >
+          {[...Array(baselineCount)].map((_, i) => i > 0 && (
+            <div
+              key={`baseline-h-${i}`}
+              className="absolute left-0 right-0 h-px bg-swiss-black/12"
+              style={{ top: i * metrics.baseline }}
+            />
+          ))}
+          {[...Array(baselineColumnCount)].map((_, i) => i > 0 && (
+            <div
+              key={`baseline-v-${i}`}
+              className="absolute top-0 bottom-0 w-px bg-swiss-black/10"
+              style={{ left: i * metrics.baseline }}
+            />
+          ))}
+        </div>
+      )}
+      {showGrid && (
+        <>
+          <div
+            className="absolute"
+            style={{
+              left: metrics.margin,
+              top: metrics.margin,
+              width: metrics.safeAreaWidth,
+              height: metrics.safeAreaHeight
+            }}
+          >
+            {[...Array(metrics.columns * metrics.rows)].map((_, i) => {
+              const col = i % metrics.columns;
+              const row = Math.floor(i / metrics.columns);
+              return (
+                <div
+                  key={i}
+                  className="absolute bg-swiss-red/[0.018]"
+                  style={{
+                    left: col * metrics.colUnit,
+                    top: row * metrics.rowUnit,
+                    width: metrics.colWidth,
+                    height: metrics.rowHeight
+                  }}
+                />
+              );
+            })}
           </div>
-        ))}
-      </div>
+          {verticalGuides.map((guide, index) => (
+            <div
+              key={`v-${index}-${guide.position}`}
+              className={`absolute top-0 bottom-0 w-px ${guideClass(guide.kind)}`}
+              style={{ left: guideLeft(guide.position) }}
+              title={guide.label}
+            />
+          ))}
+          {horizontalGuides.map((guide, index) => (
+            <div
+              key={`h-${index}-${guide.position}`}
+              className={`absolute left-0 right-0 h-px ${guideClass(guide.kind)}`}
+              style={{ top: guideTop(guide.position) }}
+              title={guide.label}
+            />
+          ))}
+        </>
+      )}
       <div className="absolute top-4 left-4 font-mono text-[8px] text-swiss-red/40 flex gap-4 uppercase font-bold">
         <span>Canvas: {label}</span>
         <span>Resolution: {size.width}x{size.height}</span>
       </div>
       <div className="absolute bottom-4 left-4 font-mono text-[8px] text-swiss-red/40 flex gap-4 uppercase font-bold">
-        <span>Modular: {COLUMNS}x{ROWS}</span>
-        <span>Gutter: {GUTTER}PX</span>
-        <span>Margin: {MARGIN}PX</span>
+        <span>Modular: {metrics.columns}x{metrics.rows}</span>
+        <span>Gutter: {metrics.gutter}/{metrics.rowGap}PT</span>
+        <span>Margin: {metrics.margin}PT</span>
+        <span>Baseline: {metrics.baseline}PT</span>
       </div>
       <div className="absolute bottom-4 right-4">
         <span className="font-mono text-[8px] text-swiss-red/40 font-bold uppercase tracking-widest">Grid System / v2.4</span>

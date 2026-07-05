@@ -34,5 +34,5 @@ Templates live in `public/templates/` and define layout rules, content slots, vi
 
 Current templates:
 
-- `discover_context_mapping_16x9`
-- `develop_prototype_demo_16x9`
+- `discover_16x9.context_mapping`
+- `develop_16x9.prototype_demo`

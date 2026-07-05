@@ -3,11 +3,11 @@ import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 
 const DEFAULT_TEMPLATE_IDS = [
-  'discover_context_mapping_16x9',
-  'discover_long_medical_strip',
-  'define_concept_sketch_long_16x9',
-  'develop_prototype_demo_16x9',
-  'deliver_final_outcome_16x9'
+  'discover_16x9.context_mapping',
+  'discover_1800x768.long_medical_strip',
+  'define_16x9.concept_sketch_long',
+  'develop_16x9.prototype_demo',
+  'deliver_16x9.final_outcome'
 ];
 const REFERENCE_GRID_WIDTH = 24;
 const REFERENCE_GRID_HEIGHT = 16;
@@ -31,9 +31,9 @@ const loadTemplateIds = async () => {
     const templateIds = Array.isArray(manifest.templates)
       ? manifest.templates.map(template => template.templateId).filter(Boolean)
       : [];
-    return templateIds.length ? templateIds : DEFAULT_TEMPLATE_IDS;
+    return templateIds;
   } catch {
-    return DEFAULT_TEMPLATE_IDS;
+    return [];
   }
 };
 
@@ -135,7 +135,7 @@ const scoreTemplateMatch = (contentProfile, template) => {
   const risks = [];
   let score = 0;
   const templateId = template.templateMeta?.templateId || '';
-  const isStripTemplate = templateId === 'discover_long_medical_strip' || profile.canvas?.ratio === '1800:768';
+  const isStripTemplate = templateId === 'discover_1800x768.long_medical_strip' || profile.canvas?.ratio === '1800:768';
   const isStripCanvas = contentProfile.canvasPresetId === 'strip-1800-768';
 
   if (isStripTemplate && !isStripCanvas) {
@@ -226,8 +226,8 @@ const scoreTemplateMatch = (contentProfile, template) => {
 
 const selectTemplate = (analysis, templates, selectedTemplateId, contentProfile) => {
   if (selectedTemplateId && selectedTemplateId !== 'auto') {
-    const safeSelectedTemplateId = selectedTemplateId === 'discover_long_medical_strip' && contentProfile.canvasPresetId !== 'strip-1800-768'
-      ? 'discover_context_mapping_16x9'
+    const safeSelectedTemplateId = selectedTemplateId === 'discover_1800x768.long_medical_strip' && contentProfile.canvasPresetId !== 'strip-1800-768'
+      ? 'discover_16x9.context_mapping'
       : selectedTemplateId;
     const selected = templates.find(template => template.templateMeta.templateId === safeSelectedTemplateId) || templates[0];
     const matches = templates
@@ -879,7 +879,7 @@ const buildTemplatePreviewRenderJSON = (template) => ({
   }))
 });
 
-const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, imageAssets) => {
+const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, imageAssets, options = {}) => {
   const assignmentMap = new Map(slotAssignments.map(assignment => [assignment.slotId, assignment]));
   const validImageIds = new Set(imageAssets.map(asset => asset.id));
   const usedAssetIds = new Set();
@@ -905,6 +905,11 @@ const buildRenderJSONFromAssignments = (template, slotAssignments, contentJSON, 
       };
 
       if (templateElement.type === 'image') {
+        if (options.disableImageAssignment) {
+          element.crop = templateElement.crop || 'cover';
+          return element;
+        }
+
         const requestedAssetId = assignment?.assetId;
         const requestedAsset = imageAssets.find(asset => asset.id === requestedAssetId);
         const uniqueRequestedAssetId = requestedAssetId &&
@@ -986,7 +991,8 @@ export default async function handler(req, res) {
       textAssets = [],
       imageAssets = [],
       referenceImages = [],
-      contentJSON = {}
+      contentJSON = {},
+      disableImageAssignment = false
     } = body;
 
     if (action === 'analyze-assets') {
@@ -1368,7 +1374,7 @@ Required JSON schema:
     const slotAssignments = useUploadedReference ? [] : normalizeSlotAssignments(parsed, selectedTemplate, editInstruction);
     const renderJSON = useUploadedReference
       ? normalizeReferenceRenderJSON(parsed, imageAssets, contentJSON)
-      : buildRenderJSONFromAssignments(selectedTemplate, slotAssignments, contentJSON, imageAssets);
+      : buildRenderJSONFromAssignments(selectedTemplate, slotAssignments, contentJSON, imageAssets, { disableImageAssignment });
 
     return res.status(200).json({
       renderJSON,
