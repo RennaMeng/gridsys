@@ -43,7 +43,14 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'openai/gpt-image-2',
         prompt: AI_PREVIEW_PROMPT,
-        input_references: [boardImage],
+        input_references: [
+          {
+            type: 'image_url',
+            image_url: {
+              url: boardImage
+            }
+          }
+        ],
         size: '1536x1024',
         quality: 'high',
         response_format: 'b64_json',
